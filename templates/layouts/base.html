@@ -75,11 +75,12 @@
                             {% if can_mod('state_user') %}
                             <li><a class="dropdown-item" href="{{ url_for('state_user.state_users_list') }}">Estados de usuario</a></li>
                             {% endif %}
-                            
                             {% if can_mod('notifications') %}
                             <li><a class="dropdown-item" href="{{ url_for('notifications.list_all') }}">Notificaciones</a></li>
                             {% endif %}
-                            
+                            {% if can('read_jugador') %}
+                            <li><a class="dropdown-item" href="{{ url_for('jugadores.list') }}">Futbolistas</a></li>
+                            {% endif %}
                         </ul>
                     </li>
                     {% endif %}

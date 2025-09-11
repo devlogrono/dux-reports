@@ -105,6 +105,7 @@ def create_app(config_object: type[Config] | None = None) -> Flask:
     from .controllers.permissions_controller import perm_bp
     from .controllers.roles_controller import roles_bp
     from .controllers.state_user_controller import state_user_bp
+    from .controllers.jugadores_controller import jugadores_bp
     from .controllers.users_controller import users_bp
 
     app.register_blueprint(auth_bp)
@@ -117,6 +118,7 @@ def create_app(config_object: type[Config] | None = None) -> Flask:
     app.register_blueprint(perm_bp)
     app.register_blueprint(roles_bp)
     app.register_blueprint(state_user_bp)
+    app.register_blueprint(jugadores_bp)
     app.register_blueprint(users_bp)
 
     # Root route -> redirect to dashboard or login

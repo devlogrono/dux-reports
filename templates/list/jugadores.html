@@ -1,0 +1,87 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Futbolistas{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-semibold">Gestión de Futbolistas</h2>
+  {% if can('create_jugador') %}
+  <a href="{{ url_for('jugadores.new') }}" id="btnNuevoJugador" class="btn btn-success">Agregar nuevo</a>
+  {% endif %}
+</div>
+<div class="card shadow-sm mb-4 bg-light border border-secondary-subtle rounded">
+  <div class="card-body">
+    <form id="jugadoresFilterForm" class="row row-cols-lg-auto g-3 align-items-end" method="get">
+      <div class="col-auto"><input type="text" name="q" class="form-control" placeholder="Filtrar por nombre, apellido, sexo o estado" value="{{ q }}"></div>
+      <div class="col-auto"><button class="btn btn-primary" type="submit">Filtrar</button></div>
+    </form>
+  </div>
+</div>
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nombre</th>
+          <th>Apellido</th>
+          <th>Sexo</th>
+          <th>Fecha Nac.</th>
+          <th>Recon. médico</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td class="text-truncate" style="max-width:150px">{{ r.id }}</td>
+          <td>{{ r.nombre }}</td>
+          <td>{{ r.apellido }}</td>
+          <td>{{ r.sexo or '' }}</td>
+          <td>{{ r.fecha_nacimiento.strftime('%Y-%m-%d') if r.fecha_nacimiento }}</td>
+          <td>{{ r.reconocimiento_medico.strftime('%Y-%m-%d') if r.reconocimiento_medico }}</td>
+          <td>{{ r.estado or '' }}</td>
+          <td>
+            {% if can('update_jugador') %}
+            <a href="{{ url_for('jugadores.edit', row_id=r.id) }}" class="btn btn-sm btn-primary jugadorActionBtn" title="Editar"><i class="bi bi-pencil-square"></i><span class="visually-hidden">Editar</span></a>
+            {% endif %}
+            {% if can('delete_jugador') %}
+            <form method="post" action="{{ url_for('jugadores.delete', row_id=r.id) }}" class="d-inline">
+              <button type="submit" class="btn btn-sm btn-danger deleteJugadorBtn" title="Borrar"><i class="bi bi-trash"></i><span class="visually-hidden">Borrar</span></button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<nav class="d-flex justify-content-center mt-4">
+  <ul class="pagination pagination-sm pagination-glass mb-0">
+    {% for p in range(1, pages+1) %}
+    <li class="page-item {% if p==page %}active{% endif %}"><a class="page-link" href="?q={{ q }}&page={{ p }}">{{ p }}</a></li>
+    {% endfor %}
+  </ul>
+</nav>
+<!-- Loading overlay -->
+<div id="jugadoresListLoading" class="position-fixed top-0 start-0 w-100 h-100 d-none justify-content-center align-items-center" style="background:rgba(255,255,255,.7);z-index:1050;">
+  <img src="{{ url_for('static', filename='img/loader.gif') }}" alt="cargando...">
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded',()=>{
+    const ov=document.getElementById('jugadoresListLoading');
+    function show(){ov.classList.remove('d-none');ov.classList.add('d-flex');}
+    const f=document.getElementById('jugadoresFilterForm');
+    if(f)f.addEventListener('submit',show);
+    const btnNuevo=document.getElementById('btnNuevoJugador');
+    if(btnNuevo)btnNuevo.addEventListener('click',show);
+    document.querySelectorAll('.jugadorActionBtn').forEach(a=>a.addEventListener('click',show));
+    document.querySelectorAll('.deleteJugadorBtn').forEach(btn=>{
+      btn.addEventListener('click',e=>{
+        e.preventDefault();const form=btn.closest('form');
+        Swal.fire({title:'¿Eliminar jugador?',text:'Esta acción no se puede deshacer',icon:'warning',showCancelButton:true,confirmButtonText:'Sí',cancelButtonText:'Cancelar'}).then(r=>{if(r.isConfirmed){show();form.submit();}});
+      });
+    });
+  });
+</script>
+{% endblock %}
