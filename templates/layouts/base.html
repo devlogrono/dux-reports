@@ -10,6 +10,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ui-elements.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
     <style>body{padding-bottom:4rem;zoom:80%;}</style>
     {% block extra_css %}{% endblock %}
 
@@ -24,7 +25,11 @@
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-custom shadow-sm">
         <div class="container-fluid">
-            <a class="navbar-brand" href="/">DUX</a>
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+              <img src="{{ url_for('static', filename='img/DUX_logr_fem_logo_1815C.png') }}" 
+                  alt="DUX Logo" 
+                  height="40">
+            </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
