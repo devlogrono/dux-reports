@@ -94,3 +94,29 @@ h1, h2, h3 {
   color: #6b7280;
   border-top: 1px solid rgba(0,0,0,0.06);
 }
+
+/* ======= Estados (badges con colores) ======= */
+/* Normalizamos texto -> clases con lower + replace(' ', '-') + sin puntos en template */
+
+.estado-badge.activo { 
+  background-color: #198754;  /* verde */
+  color: #fff;
+}
+.estado-badge.pte-actualizacion {
+  background-color: #a86500;  /* naranja oscuro */
+  color: #fff;
+}
+.estado-badge.pte-documentacion {
+  background-color: #c79200;  /* amarillo oscuro / naranja claro */
+  color: #111;
+}
+.estado-badge.pte-federacion {
+  background-color: #ffc107;  /* amarillo */
+  color: #111;
+}
+.estado-badge.pte-pago {
+  background-color: #dc3545;  /* rojo */
+  color: #fff;
+}
+
+/* Filas con reconocimiento médico vencido ya usan .table-danger de Bootstrap */
