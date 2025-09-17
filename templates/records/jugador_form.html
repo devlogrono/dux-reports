@@ -38,10 +38,25 @@
         <label for="reconocimiento_medico" class="form-label">Reconocimiento médico</label>
         <input type="date" class="form-control" id="reconocimiento_medico" name="reconocimiento_medico" value="{{ row.reconocimiento_medico.strftime('%Y-%m-%d') if row and row.reconocimiento_medico }}" />
       </div>
+
       <div class="col-md-6">
-        <label for="estado" class="form-label">Estado</label>
-        <input type="text" class="form-control" id="estado" name="estado" value="{{ row.estado if row }}" />
+        <label for="id_estado" class="form-label">Estado</label>
+        <select id="id_estado" name="id_estado" class="form-select">
+          <option value="">- Seleccionar -</option>
+          {% for eid, ename in estados %}
+            <option value="{{ eid }}" {% if row and row.id_estado==eid %}selected{% endif %}>{{ ename }}</option>
+          {% endfor %}
+        </select>
       </div>
+
+      {% if row is not none and row.__class__.__dict__.get('competicion') or estados is defined %}
+      <div class="col-md-6">
+        <label for="competicion" class="form-label">Competición</label>
+        <input type="text" class="form-control" id="competicion" name="competicion"
+               value="{{ row.competicion if row and row.__class__.__dict__.get('competicion') else '' }}" />
+      </div>
+      {% endif %}
+
       <div class="col-md-6">
         <label class="form-label">ID</label>
         <input type="text" class="form-control" value="{{ row.id if row }}" disabled />
@@ -53,10 +68,13 @@
     </form>
   </div>
 </div>
+
 <!-- Loading overlay -->
 <div id="jugadorFormLoading" class="position-fixed top-0 start-0 w-100 h-100 d-none justify-content-center align-items-center" style="background:rgba(255,255,255,.7);z-index:1050;">
   <img src="{{ url_for('static', filename='img/loader.gif') }}" alt="cargando...">
 </div>
+
+{% block extra_js %}
 <script>
   document.addEventListener('DOMContentLoaded', ()=>{
     const form=document.getElementById('jugadorForm');
@@ -75,4 +93,5 @@
     if(btnCancel){btnCancel.addEventListener('click', ()=>{ov.classList.remove('d-none');ov.classList.add('d-flex');});}
   });
 </script>
+{% endblock %}
 {% endblock %}
