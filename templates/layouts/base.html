@@ -97,6 +97,8 @@
                             {% if can('view_dashboard_directive') %}
                             <li><a class="dropdown-item" href="{{ url_for('dashboard_directive.dashboard') }}">Dirección</a></li>
                             {% endif %}
+                            <li><a class="dropdown-item" href="{{ url_for('dashboard_actas.index') }}">Actas</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('dashboard_futbolistas.index') }}">Futbolistas</a></li>
                         </ul>
                     </li>
                 </ul>

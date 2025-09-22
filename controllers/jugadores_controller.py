@@ -64,7 +64,7 @@ def list():  # type: ignore[override]
         return "Modelo futbolistas no disponible", 500
 
     q = request.args.get("q", "").strip()
-    competicion = request.args.get("competicion", "").strip()
+    competicion = request.args.get("competicion", "1FF").strip()
 
     query = db.session.query(
         F.id,
@@ -197,7 +197,19 @@ def _form(row_id: str | None = None):
                 db.session.rollback()
                 flash("Error de integridad (posible duplicado de ID)", "danger")
 
-    return render_template("records/jugador_form.html", row=row, estados=estados)
+    # calcula edad en años y meses si hay fecha de nacimiento
+    edad = None
+    if row and row.fecha_nacimiento:
+        hoy = date.today()
+        dn = row.fecha_nacimiento
+        anios = hoy.year - dn.year - ((hoy.month, hoy.day) < (dn.month, dn.day))
+        meses_tot = (hoy.year - dn.year) * 12 + (hoy.month - dn.month)
+        if hoy.day < dn.day:
+            meses_tot -= 1
+        meses = max(0, meses_tot - anios * 12)
+        edad = f"{anios} años y {meses} meses"
+
+    return render_template("records/jugador_form.html", row=row, estados=estados, edad=edad)
 
 
 @jugadores_bp.route("/new", methods=["GET", "POST"])
