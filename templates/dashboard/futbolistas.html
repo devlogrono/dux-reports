@@ -1,10 +1,94 @@
-{% extends 'layouts/base.html' %}
-{% block title %}Dashboard · Futbolistas{% endblock %}
+{% extends "layouts/base.html" %}
+
 {% block content %}
-<div class="card shadow-sm">
-  <div class="card-body">
-    <h5 class="mb-3">Futbolistas</h5>
-    <div class="text-muted py-5 text-center border rounded-3">(Contenido próximamente)</div>
-  </div>
+<div class="container py-4">
+    <h1>Dashboard Futbolistas</h1>
+
+    <form method="get" id="filtros-form" class="mb-4">
+        <div class="row g-3 align-items-end">
+            <!-- Filtro por Futbolistas -->
+            <div class="col-md-5">
+                <label for="jugadoras">Seleccionar futbolistas</label>
+                <select name="jugadoras" id="jugadoras" multiple class="form-select">
+                    {% for f in futbolistas %}
+                        <option value="{{ f.nombre_completo }}"
+                            {% if f.nombre_completo in seleccionadas %} selected {% endif %}>
+                            {{ f.nombre_completo }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Filtro por Competición -->
+            <div class="col-md-5">
+                <label for="competicion">Seleccionar Competición</label>
+                <select name="competicion" id="competicion" multiple class="form-select">
+                    {% for c in competiciones %}
+                        <option value="{{ c }}"
+                            {% if c in seleccionadas_competicion %} selected {% endif %}>
+                            {{ c }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Botones -->
+            <div class="col-md-2 d-flex flex-column">
+                <button type="submit" class="btn btn-primary mb-2">Aplicar filtros</button>
+                <button type="button" id="limpiar-filtros" class="btn btn-secondary">Limpiar filtros</button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Gráfico -->
+    <canvas id="grafico-partidos" height="300"></canvas> <!-- altura aumentada -->
 </div>
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.getElementById('limpiar-filtros').addEventListener('click', function() {
+    document.getElementById('jugadoras').selectedIndex = -1;
+    document.getElementById('competicion').selectedIndex = -1;
+    document.getElementById('filtros-form').submit();
+});
+
+const ctx = document.getElementById('grafico-partidos').getContext('2d');
+const chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: {{ futbolistas | map(attribute='nombre_completo') | list | tojson }},
+        datasets: [{
+            label: 'Partidos jugados',
+            data: {{ futbolistas | map(attribute='partidos') | list | tojson }},
+            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false },
+            tooltip: { mode: 'index', intersect: false }
+        },
+        layout: {
+            padding: 10
+        },
+        scales: {
+            y: { 
+                beginAtZero: true, 
+                stepSize: 1,
+                ticks: { color: '#000' } // eje Y negro
+            },
+            x: { 
+                ticks: { color: '#000' }, // eje X negro
+                grid: { color: '#ccc' }   // cuadrícula suave gris
+            }
+        },
+        backgroundColor: '#fff' // fondo blanco
+    }
+});
+</script>
+{% endblock %}
 {% endblock %}
