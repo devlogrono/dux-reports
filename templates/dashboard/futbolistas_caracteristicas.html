@@ -1,0 +1,359 @@
+{% extends "layouts/base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>Dashboard Futbolistas</h1>
+
+    {# Tabs locales para navegar entre dashboards, preservando filtros #}
+    {% set ns = namespace(qs=[]) %}
+    {% for n in seleccionadas %}{% set ns.qs = ns.qs + ['jugadoras=' ~ n|urlencode] %}{% endfor %}
+    {% for c in seleccionadas_competicion %}{% set ns.qs = ns.qs + ['competicion=' ~ c|urlencode] %}{% endfor %}
+    {% set qstr = '?' ~ ns.qs|join('&') if ns.qs else '' %}
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('dashboard_futbolistas.index') }}{{ qstr }}">Participaciones</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link active" href="{{ url_for('dashboard_futbolistas.caracteristicas') }}{{ qstr }}">Características</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.estadisticas' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.estadisticas') }}{{ qstr }}">Estadísticas</a>
+        </li>
+    </ul>
+
+    <!-- Filtros centrados y con ancho contenido -->
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10 col-xl-8">
+            <form method="get" id="filtros-form" class="mb-4">
+                <div class="row g-3 align-items-end">
+                    <!-- Filtro por Futbolistas -->
+                    <div class="col-md-5">
+                        <label for="jugadoras">Seleccionar futbolistas</label>
+                        <select name="jugadoras" id="jugadoras" multiple class="form-select">
+                            {% for f in futbolistas %}
+                                <option value="{{ f.nombre_completo }}"
+                                    {% if f.nombre_completo in seleccionadas %} selected {% endif %}>
+                                    {{ f.nombre_completo }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Filtro por Competición -->
+                    <div class="col-md-5">
+                        <label for="competicion">Seleccionar Competición</label>
+                        <select name="competicion" id="competicion" multiple class="form-select">
+                            {% for c in competiciones %}
+                                <option value="{{ c }}"
+                                    {% if c in seleccionadas_competicion %} selected {% endif %}>
+                                    {{ c }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Botones -->
+                    <div class="col-md-2 d-flex flex-column">
+                        <button type="submit" class="btn btn-primary mb-2">Aplicar filtros</button>
+                        <button type="button" id="limpiar-filtros" class="btn btn-secondary">Limpiar filtros</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if not seleccionadas_competicion %}
+    <!-- Distribución por competición (visible solo sin filtro de competición) -->
+    <div class="rounded shadow-sm p-3 mb-4" style="background-color: rgba(255,255,255,0.9);">
+        <div class="d-flex justify-content-between flex-wrap gap-2 mb-2">
+            <div class="d-flex align-items-center gap-2">
+                <label for="select-top" class="mb-0 small text-muted">Top N</label>
+                <select id="select-top" class="form-select form-select-sm" style="width:auto;min-width:120px;">
+                    <option value="all" selected>Todos</option>
+                    <option value="10">Top 10</option>
+                    <option value="20">Top 20</option>
+                </select>
+                <div class="form-check form-switch ms-3">
+                    <input class="form-check-input" type="checkbox" id="toggle-datalabels">
+                    <label class="form-check-label small" for="toggle-datalabels">Mostrar valores</label>
+                </div>
+            </div>
+            <div>
+                <button type="button" id="btn-descargar-chart" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-download"></i> Descargar PNG
+                </button>
+            </div>
+        </div>
+        <div class="position-relative" style="height:60vh;">
+            <canvas id="grafico-caracteristicas"
+                data-labels='{{ dist_comp | map(attribute="competicion") | list | tojson }}'
+                data-values='{{ dist_comp | map(attribute="cantidad") | list | tojson }}'></canvas>
+        </div>
+    </div>
+
+    {% endif %}
+
+    <!-- Edad por jugador -->
+    <div class="rounded shadow-sm p-3 mb-4" style="background-color: rgba(255,255,255,0.9);">
+        <div class="d-flex justify-content-between flex-wrap gap-2 mb-2">
+            <h5 class="mb-0">Edad por jugador</h5>
+            <div class="d-flex align-items-center gap-2">
+                <label for="orden-edad" class="mb-0 small text-muted">Orden</label>
+                <select id="orden-edad" class="form-select form-select-sm" style="width:auto;min-width:160px;">
+                    <option value="desc" selected>Edad (desc)</option>
+                    <option value="asc">Edad (asc)</option>
+                    <option value="name">Nombre</option>
+                </select>
+            </div>
+        </div>
+        <div class="position-relative" style="height:60vh;">
+            <canvas id="grafico-edad"
+                data-labels='{{ jugadores_detalle | map(attribute="nombre_completo") | list | tojson }}'
+                data-values='{{ jugadores_detalle | map(attribute="edad_meses") | list | tojson }}'></canvas>
+        </div>
+    </div>
+
+    <!-- Reconocimiento médico por jugador (fecha) -->
+    <div class="rounded shadow-sm p-3" style="background-color: rgba(255,255,255,0.9);">
+        <div class="d-flex justify-content-between flex-wrap gap-2 mb-2">
+            <h5 class="mb-0">Reconocimiento médico por jugador</h5>
+            <div class="d-flex align-items-center gap-2">
+                <label for="filtro-anio-recon" class="mb-0 small text-muted">Año</label>
+                <select id="filtro-anio-recon" class="form-select form-select-sm" style="width:auto;min-width:120px;"></select>
+                <label for="orden-recon" class="mb-0 small text-muted">Orden</label>
+                <select id="orden-recon" class="form-select form-select-sm" style="width:auto;min-width:160px;">
+                    <option value="date_desc" selected>Fecha (recientes primero)</option>
+                    <option value="date_asc">Fecha (antiguos primero)</option>
+                    <option value="name">Nombre</option>
+                </select>
+            </div>
+        </div>
+        <div class="position-relative" style="height:70vh;">
+            <canvas id="grafico-recon"
+                data-labels='{{ jugadores_detalle | map(attribute="nombre_completo") | list | tojson }}'
+                data-ts='{{ jugadores_detalle | map(attribute="reconocimiento_ts") | list | tojson }}'
+                data-fechas='{{ jugadores_detalle | map(attribute="reconocimiento_medico") | list | tojson }}'></canvas>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+<script>
+// limpiar filtros
+document.getElementById('limpiar-filtros').addEventListener('click', function() {
+    const jug = document.getElementById('jugadoras');
+    const comp = document.getElementById('competicion');
+    if (jug) jug.selectedIndex = -1;
+    if (comp) comp.selectedIndex = -1;
+    document.getElementById('filtros-form').submit();
+});
+
+if (window.ChartDataLabels) { Chart.register(ChartDataLabels); }
+
+// --- Distribución por competición (solo si existe en el DOM) ---
+const distEl = document.getElementById('grafico-caracteristicas');
+let distChart = null;
+if (distEl) {
+  const distLabels = JSON.parse(distEl.dataset.labels || '[]');
+  const distValues = JSON.parse(distEl.dataset.values || '[]');
+  const distCtx = distEl.getContext('2d');
+  function buildDistData(labels, values) {
+    return { labels, datasets: [{ label: 'Futbolistas por competición', data: values,
+      backgroundColor: 'rgba(13, 110, 253, 0.7)', borderColor: '#0d6efd', borderWidth: 1 }] };
+  }
+  distChart = new Chart(distCtx, {
+    type: 'bar',
+    data: buildDistData(distLabels, distValues),
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false, labels: { color: '#111' } },
+        tooltip: { callbacks: { title: (items)=> distLabels[items[0].dataIndex] } },
+        datalabels: { display: false, color: '#111', anchor: 'end', align: 'top', offset: 2, formatter: (v)=> v }
+      },
+      interaction: { mode: 'index', intersect: false },
+      layout: { padding: 16 },
+      elements: { bar: { borderRadius: 4 } },
+      scales: {
+        y: { beginAtZero: true, ticks: { color: '#222', stepSize: 1 }, grid: { color: '#e5e7eb', drawBorder: false } },
+        x: { ticks: { color: '#222', maxRotation: 45, autoSkip: true,
+            callback: (value, idx)=>{
+              const lbl = distLabels[idx] || ''; const maxLen=14; return lbl.length>maxLen? lbl.slice(0,maxLen)+'…' : lbl;
+            }
+          }, grid: { color: '#e5e7eb', drawBorder: false } }
+      },
+      backgroundColor: '#fff'
+    }
+  });
+  const btnPng = document.getElementById('btn-descargar-chart');
+  if (btnPng) btnPng.addEventListener('click', ()=>{
+    const link = document.createElement('a');
+    link.href = distChart.toBase64Image('image/png', 1.0);
+    link.download = 'dashboard-futbolistas-caracteristicas.png';
+    link.click();
+  });
+  const selTop = document.getElementById('select-top');
+  if (selTop) selTop.addEventListener('change', function(){
+    const val = this.value;
+    let idx = distLabels.map((_, i)=> i);
+    idx.sort((a,b)=> distValues[b]-distValues[a]);
+    let useIdx = idx;
+    if (val !== 'all') { const n = parseInt(val,10); useIdx = idx.slice(0,n); }
+    const newLabels = useIdx.map(i=> distLabels[i]);
+    const newValues = useIdx.map(i=> distValues[i]);
+    distChart.data = buildDistData(newLabels, newValues);
+    distChart.update();
+  });
+  const toggleDL = document.getElementById('toggle-datalabels');
+  if (toggleDL) toggleDL.addEventListener('change', function(){
+    distChart.options.plugins.datalabels.display = this.checked;
+    distChart.update();
+  });
+}
+
+// ---------- Edad por jugador ----------
+const edadEl = document.getElementById('grafico-edad');
+const edadLabels = JSON.parse(edadEl.dataset.labels || '[]');
+const edadValuesRaw = JSON.parse(edadEl.dataset.values || '[]');
+// Filtrar out null/NaN, v en meses
+let edadPairs = edadLabels.map((l,i)=>({l, v: parseFloat(edadValuesRaw[i])})).filter(x=>!isNaN(x.v));
+function ym(meses){ const y=Math.floor(meses/12); const m=meses%12; return `${y} años y ${m} meses`; }
+function buildEdadData(pairs){
+  return { labels: pairs.map(x=>x.l), datasets: [{ label: 'Edad', data: pairs.map(x=>x.v),
+    backgroundColor: 'rgba(13, 110, 253, 0.7)', borderColor: '#0d6efd', borderWidth: 1 }] };
+}
+let edadLabelsUse = edadPairs.map(x=>x.l);
+let edadValues = edadPairs.map(x=>x.v);
+let edadChart = new Chart(edadEl.getContext('2d'), {
+  type: 'bar',
+  data: { labels: edadLabelsUse, datasets: [{
+    label: 'Edad', data: edadValues,
+    backgroundColor: 'rgba(13, 110, 253, 0.7)', borderColor: '#0d6efd', borderWidth: 1
+  }]},
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      datalabels: { display: false, color: '#111', anchor: 'end', align: 'top', offset: 2,
+        formatter: (value)=> ym(value) },
+      tooltip: { callbacks: { title: (items)=>edadLabelsUse[items[0].dataIndex],
+        label: (item)=> ym(item.parsed.y) } }
+    },
+    interaction: { mode: 'index', intersect: false },
+    elements: { bar: { borderRadius: 4 } },
+    scales: {
+      y: { beginAtZero: true, ticks: { color: '#222', stepSize: 12, callback: (v)=> ym(v) }, grid: { color: '#e5e7eb', drawBorder: false } },
+      x: { ticks: { color: '#222', maxRotation: 45, autoSkip: true }, grid: { color: '#e5e7eb', drawBorder: false } }
+    },
+    backgroundColor: '#fff'
+  }
+});
+// Ordenamiento edad
+const ordenEdadSel = document.getElementById('orden-edad');
+ordenEdadSel.addEventListener('change', ()=>{
+  const mode = ordenEdadSel.value;
+  let pairs = [...edadPairs];
+  if(mode==='desc') pairs.sort((a,b)=>b.v-a.v);
+  else if(mode==='asc') pairs.sort((a,b)=>a.v-b.v);
+  else if(mode==='name') pairs.sort((a,b)=>a.l.localeCompare(b.l,'es',{sensitivity:'base'}));
+  const d = buildEdadData(pairs);
+  edadChart.data = d;
+  edadChart.update();
+});
+
+// ---------- Reconocimiento médico por jugador (fecha) ----------
+const recEl = document.getElementById('grafico-recon');
+const recLabels = JSON.parse(recEl.dataset.labels || '[]');
+const recTsRaw = JSON.parse(recEl.dataset.ts || '[]');
+const recFechaRaw = JSON.parse(recEl.dataset.fechas || '[]');
+function fmtDMY(iso){ if(!iso) return '—'; const d=new Date(iso); if(isNaN(d)) return '—'; const dd=String(d.getDate()).padStart(2,'0'); const mm=String(d.getMonth()+1).padStart(2,'0'); const yy=d.getFullYear(); return `${dd}/${mm}/${yy}`; }
+function monthNameEs(m){ return ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][m] || ''; }
+let recPairs = recLabels.map((l,i)=>({l, ts: recTsRaw[i], f: recFechaRaw[i]})).filter(x=>x.ts!==null && x.ts!==undefined);
+let recLabelsUse = recPairs.map(x=>x.l);
+let recTs = recPairs.map(x=>x.ts);
+let recFechasUse = recPairs.map(x=>fmtDMY(x.f));
+let recChart = new Chart(recEl.getContext('2d'), {
+  type: 'bar',
+  data: { labels: recLabelsUse, datasets: [{
+    label: 'Fecha de reconocimiento', data: recTs,
+    backgroundColor: 'rgba(25, 135, 84, 0.7)', borderColor: '#198754', borderWidth: 1
+  }]},
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    indexAxis: 'y',
+    plugins: {
+      legend: { display: false },
+      datalabels: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (item)=> {
+            const i = item.dataIndex;
+            return recLabelsUse[i] + ': ' + (recFechasUse[i] || '—');
+          },
+          title: ()=> 'Reconocimiento médico'
+        }
+      }
+    },
+    elements: { bar: { borderRadius: 4 } },
+    scales: {
+      x: {
+        type: 'time',
+        time: { unit: 'month', round: 'month', tooltipFormat: 'dd/MM/yyyy' },
+        min: new Date('2025-03-01'),
+        max: new Date('2027-12-31'),
+        ticks: {
+          color: '#222',
+          callback: (value)=>{
+            const d = new Date(value);
+            if (isNaN(d)) return '';
+            const m = d.getMonth();
+            // Solo mostrar marzo, junio, septiembre, diciembre
+            if (m===2 || m===5 || m===8 || m===11) return `${monthNameEs(m)} ${d.getFullYear()}`;
+            return '';
+          }
+        },
+        grid: { color: '#e5e7eb', drawBorder: false }
+      },
+      y: { ticks: { color: '#222' }, grid: { color: '#e5e7eb', drawBorder: false } }
+    },
+    backgroundColor: '#fff'
+  }
+});
+
+// Controles: filtro de año y orden
+const ordenReconSel = document.getElementById('orden-recon');
+const filtroAnioRecon = document.getElementById('filtro-anio-recon');
+function uniqueYears() {
+  const years = new Set();
+  recPairs.forEach(p=>{ if(p.f){ const d=new Date(p.f); if(!isNaN(d)) years.add(d.getFullYear()); } });
+  return Array.from(years).sort((a,b)=>b-a);
+}
+function applyReconFilters() {
+  const mode = ordenReconSel.value;
+  const year = filtroAnioRecon.value;
+  let pairs = recLabels.map((l,i)=>({l, ts: recTsRaw[i], f: recFechaRaw[i]})).filter(x=>x.ts!==null && x.ts!==undefined);
+  if(year!=="all") {
+    pairs = pairs.filter(p=>{ const d=new Date(p.f); return !isNaN(d) && d.getFullYear().toString()===year; });
+  }
+  if(mode==='date_desc') pairs.sort((a,b)=>b.ts-a.ts);
+  else if(mode==='date_asc') pairs.sort((a,b)=>a.ts-b.ts);
+  else if(mode==='name') pairs.sort((a,b)=>a.l.localeCompare(b.l,'es',{sensitivity:'base'}));
+  recLabelsUse = pairs.map(x=>x.l);
+  recTs = pairs.map(x=>x.ts);
+  recFechasUse = pairs.map(x=>fmtDMY(x.f));
+  recChart.data.labels = recLabelsUse;
+  recChart.data.datasets[0].data = recTs;
+  recChart.update();
+}
+// Inicializar años y listeners
+const years = uniqueYears();
+filtroAnioRecon.innerHTML = `<option value="all" selected>Todos</option>` + years.map(y=>`<option value="${y}">${y}</option>`).join('');
+ordenReconSel.addEventListener('change', applyReconFilters);
+filtroAnioRecon.addEventListener('change', applyReconFilters);
+</script>
+{% endblock %}
+{% endblock %}

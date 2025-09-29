@@ -12,7 +12,6 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ui-elements.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
     <link rel="stylesheet" href="https://cdn.datatables.net/v/bs5/dt-2.0.7/datatables.min.css">
-    <style>body{padding-bottom:4rem;zoom:80%;}</style>
     {% block extra_css %}{% endblock %}
 
     <style>
@@ -22,7 +21,7 @@
           background-size: cover;
           z-index: 0; /* asegura que el contenido quede encima */
       }
-  
+
       body::before {
           content: "";
           position: fixed;
@@ -30,17 +29,17 @@
           left: 0;
           width: 100%;
           height: 100%;
-          background-color: rgba(0, 0, 0, 0.5); /* negro semitransparente para oscurecer */
+          background-color: rgba(0, 0, 0, 0.25); /* aclarado: menos contraste con texto negro */
           pointer-events: none; /* no bloquea clicks */
           z-index: 0;
       }
-  
+
       /* Para que el contenido quede encima del overlay */
       body > * {
           position: relative;
           z-index: 1;
       }
-  </style>
+    </style>
 </head>
 <body class="d-flex flex-column min-vh-100">
     <!-- Navbar -->
@@ -164,7 +163,7 @@
   <img src="{{ url_for('static', filename='img/loader.gif') }}" alt="cargando...">
 </div>
 <!-- Footer -->
-    <footer class="footer fixed-bottom py-3 bg-light border-top">
+    <footer class="footer fixed-bottom py-3 bg-white border-top">
         <div class="container text-center">
             <span class="text-muted">DUX © 2025</span>
         </div>
