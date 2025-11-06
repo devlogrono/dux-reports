@@ -4,6 +4,7 @@ Campos: id (PK, varchar), nombre, apellido, sexo, fecha_nacimiento (date), recon
 import math
 import uuid
 from datetime import date, datetime
+from difflib import get_close_matches
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required
 from sqlalchemy.exc import IntegrityError
@@ -194,10 +195,62 @@ def list():  # type: ignore[override]
     )
 
 
+# Diccionario de países con sus códigos ISO
+PAISES_ISO = {
+    'España': 'ES', 'Alemania': 'DE', 'Francia': 'FR', 'Italia': 'IT', 'Portugal': 'PT',
+    'Inglaterra': 'GB-ENG', 'Reino Unido': 'GB', 'Escocia': 'GB-SCT', 'Gales': 'GB-WLS',
+    'Paises Bajos': 'NL', 'Holanda': 'NL', 'Belgica': 'BE', 'Suiza': 'CH', 'Austria': 'AT',
+    'Dinamarca': 'DK', 'Suecia': 'SE', 'Noruega': 'NO', 'Finlandia': 'FI', 'Polonia': 'PL',
+    'Republica Checa': 'CZ', 'Hungria': 'HU', 'Rumania': 'RO', 'Bulgaria': 'BG', 'Grecia': 'GR',
+    'Croacia': 'HR', 'Serbia': 'RS', 'Eslovenia': 'SI', 'Eslovaquia': 'SK', 'Ucrania': 'UA',
+    'Rusia': 'RU', 'Turquia': 'TR', 'Brasil': 'BR', 'Argentina': 'AR', 'Uruguay': 'UY',
+    'Paraguay': 'PY', 'Chile': 'CL', 'Colombia': 'CO', 'Peru': 'PE', 'Venezuela': 'VE',
+    'Ecuador': 'EC', 'Bolivia': 'BO', 'Mexico': 'MX', 'Estados Unidos': 'US', 'Canada': 'CA',
+    'Japon': 'JP', 'Corea del Sur': 'KR', 'China': 'CN', 'Australia': 'AU', 'Nueva Zelanda': 'NZ',
+    'Marruecos': 'MA', 'Argelia': 'DZ', 'Tunez': 'TN', 'Egipto': 'EG', 'Nigeria': 'NG',
+    'Senegal': 'SN', 'Ghana': 'GH', 'Costa de Marfil': 'CI', 'Camerun': 'CM', 'Sudafrica': 'ZA'
+}
+
+def _normalizar_pais(pais_input: str) -> tuple[str, str] | None:
+    """Convierte nombre de país a código ISO usando fuzzy matching.
+    Retorna (nombre_estandarizado, codigo_iso) o None"""
+    if not pais_input:
+        return None
+    
+    pais_input = pais_input.strip()
+    # Normalizar texto (quitar tildes, minúsculas)
+    pais_normalizado = pais_input.lower()
+    normalizaciones = {
+        'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
+        'ñ': 'n', 'ü': 'u'
+    }
+    for orig, repl in normalizaciones.items():
+        pais_normalizado = pais_normalizado.replace(orig, repl)
+    
+    # Crear versión normalizada de los países
+    paises_normalizados = {}
+    for nombre, iso in PAISES_ISO.items():
+        nombre_norm = nombre.lower()
+        for orig, repl in normalizaciones.items():
+            nombre_norm = nombre_norm.replace(orig, repl)
+        paises_normalizados[nombre_norm] = (nombre, iso)
+    
+    # Buscar coincidencia exacta primero
+    if pais_normalizado in paises_normalizados:
+        return paises_normalizados[pais_normalizado]
+    
+    # Fuzzy matching
+    matches = get_close_matches(pais_normalizado, paises_normalizados.keys(), n=1, cutoff=0.6)
+    if matches:
+        return paises_normalizados[matches[0]]
+    
+    return None
+
 # helper formulario
 def _form(row_id: str | None = None):
     F = _model("futbolistas")
     S = _model("state_user")
+    I = _model("informacion_futbolistas")
     if not F:
         return "Modelo futbolistas no disponible", 500
 
@@ -206,6 +259,11 @@ def _form(row_id: str | None = None):
         estados = db.session.query(S.id, S.name).order_by(S.name.asc()).all()
 
     row = db.session.get(F, row_id) if row_id else None
+    info_row = None
+    
+    # Cargar información adicional si existe
+    if row_id and I:
+        info_row = db.session.query(I).filter(getattr(I, "id_futbolista", None) == row_id).first()
 
     if request.method == "POST":
         nombre = (request.form.get("nombre") or "").strip()
@@ -215,6 +273,23 @@ def _form(row_id: str | None = None):
         fecha_nacimiento = _parse_date(request.form.get("fecha_nacimiento"))
         reconocimiento_medico = _parse_date(request.form.get("reconocimiento_medico"))
         competicion_val = (request.form.get("competicion") or "").strip() if hasattr(F, "competicion") else None
+        
+        # Nuevos campos de informacion_futbolistas
+        dorsal_val = request.form.get("dorsal", "").strip()
+        posicion_val = request.form.get("posicion", "").strip()
+        nacionalidad_input = request.form.get("nacionalidad", "").strip()
+        altura_val = request.form.get("altura", "").strip()
+        peso_val = request.form.get("peso", "").strip()
+        
+        # Procesar nacionalidad con fuzzy matching
+        nacionalidad_iso = None
+        nacionalidad_nombre = None
+        if nacionalidad_input:
+            resultado = _normalizar_pais(nacionalidad_input)
+            if resultado:
+                nacionalidad_nombre, nacionalidad_iso = resultado
+            else:
+                nacionalidad_iso = nacionalidad_input.upper()[:2]  # Fallback: primeras 2 letras en mayúscula
 
         if not nombre or not apellido:
             flash("Nombre y Apellido son obligatorios", "warning")
@@ -232,13 +307,41 @@ def _form(row_id: str | None = None):
                 row.reconocimiento_medico = reconocimiento_medico
                 if hasattr(F, "competicion"):
                     setattr(row, "competicion", competicion_val or None)
+                
+                db.session.flush()  # Para obtener el ID si es nuevo
+                
+                # Actualizar o crear registro en informacion_futbolistas
+                if I and row.id:
+                    if not info_row:
+                        info_row = I()
+                        setattr(info_row, "id_futbolista", row.id)
+                        db.session.add(info_row)
+                    
+                    # Actualizar campos
+                    if hasattr(I, "dorsal"):
+                        setattr(info_row, "dorsal", int(dorsal_val) if dorsal_val and dorsal_val.isdigit() else None)
+                    if hasattr(I, "posicion"):
+                        setattr(info_row, "posicion", posicion_val or None)
+                    if hasattr(I, "nacionalidad"):
+                        setattr(info_row, "nacionalidad", nacionalidad_iso or None)
+                    if hasattr(I, "altura"):
+                        setattr(info_row, "altura", float(altura_val) if altura_val else None)
+                    if hasattr(I, "peso"):
+                        setattr(info_row, "peso", float(peso_val) if peso_val else None)
 
                 db.session.commit()
-                flash("Futbolista guardado", "success")
+                
+                if nacionalidad_nombre and nacionalidad_input.lower() != nacionalidad_nombre.lower():
+                    flash(f"Futbolista guardado. Nacionalidad interpretada como: {nacionalidad_nombre}", "success")
+                else:
+                    flash("Futbolista guardado", "success")
                 return redirect(url_for("jugadores.list"))
             except IntegrityError:
                 db.session.rollback()
                 flash("Error de integridad (posible duplicado de ID)", "danger")
+            except Exception as e:
+                db.session.rollback()
+                flash(f"Error al guardar: {str(e)}", "danger")
 
     # calcula edad en años y meses si hay fecha de nacimiento
     edad = None
@@ -251,8 +354,41 @@ def _form(row_id: str | None = None):
             meses_tot -= 1
         meses = max(0, meses_tot - anios * 12)
         edad = f"{anios} años y {meses} meses"
+    
+    # Obtener nombre del país desde el código ISO
+    nacionalidad_display = None
+    if info_row and hasattr(info_row, "nacionalidad") and info_row.nacionalidad:
+        # Buscar el nombre del país por su código ISO
+        for nombre, iso in PAISES_ISO.items():
+            if iso == info_row.nacionalidad:
+                nacionalidad_display = nombre
+                break
+        if not nacionalidad_display:
+            nacionalidad_display = info_row.nacionalidad  # Mostrar código si no se encuentra
 
-    return render_template("records/jugador_form.html", row=row, estados=estados, edad=edad)
+    # Obtener lista de competiciones para el desplegable
+    competiciones = []
+    D = getattr(Base.classes, "diccionario_competiciones", None)
+    if hasattr(F, "competicion") and D is not None:
+        rows_comp = (
+            db.session.query(D.id, D.nombre_competicion)
+            .join(F, F.competicion == D.id)
+            .filter(F.competicion.isnot(None))
+            .distinct()
+            .order_by(D.nombre_competicion.asc())
+            .all()
+        )
+        competiciones = [{"id": r[0], "nombre": r[1]} for r in rows_comp]
+
+    return render_template(
+        "records/jugador_form.html", 
+        row=row, 
+        estados=estados, 
+        edad=edad,
+        info_row=info_row,
+        nacionalidad_display=nacionalidad_display,
+        competiciones=competiciones
+    )
 
 
 @jugadores_bp.route("/new", methods=["GET", "POST"])
