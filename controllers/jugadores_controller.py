@@ -7,7 +7,7 @@ from datetime import date, datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import or_
+from sqlalchemy import or_, case
 
 from dux import db
 from dux.models import Base
@@ -78,6 +78,8 @@ def list():  # type: ignore[override]
         getattr(F, "competicion", None).label("competicion"),
         S.name.label("estado_nombre"),
         getattr(I, "nacionalidad", None).label("nacionalidad"),
+        getattr(I, "posicion", None).label("posicion"),
+        getattr(I, "dorsal", None).label("dorsal"),
     )
 
     # añade el JOIN (LEFT/OUTER para no romper si falta info):
@@ -102,8 +104,23 @@ def list():  # type: ignore[override]
     if competicion and hasattr(F, "competicion"):
         query = query.filter(F.competicion == competicion)
 
-    query = query.order_by(F.apellido.is_(None), F.apellido.asc(),
-                           F.nombre.is_(None), F.nombre.asc())
+    # Ordenamiento personalizado por posición (POR, DEF, MC, DEL) y luego por dorsal
+    if I is not None:
+        posicion_order = case(
+            (getattr(I, "posicion", None) == "POR", 1),
+            (getattr(I, "posicion", None) == "DEF", 2),
+            (getattr(I, "posicion", None) == "MC", 3),
+            (getattr(I, "posicion", None) == "DEL", 4),
+            else_=5
+        )
+        query = query.order_by(
+            posicion_order,
+            getattr(I, "dorsal", None).is_(None),
+            getattr(I, "dorsal", None).asc()
+        )
+    else:
+        query = query.order_by(F.apellido.is_(None), F.apellido.asc(),
+                               F.nombre.is_(None), F.nombre.asc())
 
     page = int(request.args.get("page", 1))
     per_page = 50
@@ -132,6 +149,8 @@ def list():  # type: ignore[override]
             "id": r.id,
             "nombre": r.nombre,
             "apellido": r.apellido,
+            "dorsal": getattr(r, "dorsal", None),
+            "posicion": getattr(r, "posicion", None),
             "sexo": r.sexo,
             "edad": edad_ym(fn),
             "reconocimiento_medico": rm,     # ya es date o None
@@ -155,6 +174,11 @@ def list():  # type: ignore[override]
         )
         competiciones = [{"id": r[0], "nombre": r[1]} for r in rows_comp]
 
+    # Verificar si al menos un jugador tiene cada campo
+    mostrar_nacionalidad = any(r["nacionalidad"] for r in rows)
+    mostrar_dorsal = any(r["dorsal"] for r in rows)
+    mostrar_posicion = any(r["posicion"] for r in rows)
+
     return render_template(
         "list/jugadores.html",
         rows=rows,
@@ -163,7 +187,10 @@ def list():  # type: ignore[override]
         pages=pages,
         competicion=competicion,
         competiciones=competiciones,
-        total=total
+        total=total,
+        mostrar_nacionalidad=mostrar_nacionalidad,
+        mostrar_dorsal=mostrar_dorsal,
+        mostrar_posicion=mostrar_posicion
     )
 
 

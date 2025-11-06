@@ -40,9 +40,17 @@
       <thead>
         <tr>
           <th class="d-none">ID</th>
+          {% if mostrar_dorsal %}
+          <th>Dorsal</th>
+          {% endif %}
           <th>Nombre</th>
           <th>Apellido</th>
+          {% if mostrar_posicion %}
+          <th>Posición</th>
+          {% endif %}
+          {% if mostrar_nacionalidad %}
           <th class="text-center">Nacionalidad</th>
+          {% endif %}
           <th>Sexo</th>
           <th>Edad</th>
           <th>Recon. médico</th>
@@ -54,14 +62,21 @@
         {% for r in rows %}
         <tr>
           <td class="text-truncate d-none" style="max-width:150px">{{ r.id }}</td>
+          {% if mostrar_dorsal %}
+          <td>{{ r.dorsal or '' }}</td>
+          {% endif %}
           <td>{{ r.nombre }}</td>
           <td>{{ r.apellido }}</td>
+          {% if mostrar_posicion %}
+          <td>{{ r.posicion or '' }}</td>
+          {% endif %}
+          {% if mostrar_nacionalidad %}
           <td class="text-center">
             {% if r.nacionalidad %}
               <span class="fi fi-{{ r.nacionalidad|lower }}" title="{{ r.nacionalidad }}"></span>
             {% endif %}
           </td>
-          </td>
+          {% endif %}
           <td>{{ r.sexo or '' }}</td>
           <td>{{ r.edad }}</td>
           <td class="{% if r.vencido %}text-danger fw-semibold{% endif %}">
