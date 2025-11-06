@@ -16,11 +16,13 @@
         <input type="text" name="q" class="form-control" placeholder="Filtrar por nombre, apellido, sexo o estado" value="{{ q }}">
       </div>
       <div class="col-auto">
-        <label class="form-label mb-0">Competición</label>
+        <label class="form-label mb-0">Equipo</label>
         <select name="competicion" class="form-select">
           <option value="">Todas</option>
           {% for c in competiciones %}
-            <option value="{{ c }}" {% if competicion==c %}selected{% endif %}>{{ c }}</option>
+            <option value="{{ c.id }}" {% if competicion==c.id %}selected{% endif %}>
+              {{ c.nombre }}
+            </option>
           {% endfor %}
         </select>
       </div>
@@ -40,6 +42,7 @@
           <th class="d-none">ID</th>
           <th>Nombre</th>
           <th>Apellido</th>
+          <th class="text-center">Nacionalidad</th>
           <th>Sexo</th>
           <th>Edad</th>
           <th>Recon. médico</th>
@@ -53,6 +56,12 @@
           <td class="text-truncate d-none" style="max-width:150px">{{ r.id }}</td>
           <td>{{ r.nombre }}</td>
           <td>{{ r.apellido }}</td>
+          <td class="text-center">
+            {% if r.nacionalidad %}
+              <span class="fi fi-{{ r.nacionalidad|lower }}" title="{{ r.nacionalidad }}"></span>
+            {% endif %}
+          </td>
+          </td>
           <td>{{ r.sexo or '' }}</td>
           <td>{{ r.edad }}</td>
           <td class="{% if r.vencido %}text-danger fw-semibold{% endif %}">

@@ -60,6 +60,7 @@ def _to_date(v) -> date | None:
 def list():  # type: ignore[override]
     F = _model("futbolistas")
     S = _model("state_user")
+    I = _model("informacion_futbolistas")
     if not F:
         return "Modelo futbolistas no disponible", 500
 
@@ -76,7 +77,16 @@ def list():  # type: ignore[override]
         F.id_estado,
         getattr(F, "competicion", None).label("competicion"),
         S.name.label("estado_nombre"),
-    ).outerjoin(S, F.id_estado == S.id)
+        getattr(I, "nacionalidad", None).label("nacionalidad"),
+    )
+
+    # añade el JOIN (LEFT/OUTER para no romper si falta info):
+    if I is not None:
+        # usa la clave correcta según tu BD:
+        query = query.outerjoin(I, getattr(I, "id_futbolista", None) == F.id)
+
+    # (el join con estados ya está)
+    query = query.outerjoin(S, F.id_estado == S.id)
 
     if q:
         like = f"%{q}%"
@@ -129,15 +139,21 @@ def list():  # type: ignore[override]
             "id_estado": r.id_estado,
             "competicion": getattr(r, "competicion", None),
             "vencido": vencido,
+            "nacionalidad": getattr(r, "nacionalidad", None),
         })
 
     competiciones = []
-    if hasattr(F, "competicion"):
-        competiciones = [
-            c[0] for c in db.session.query(F.competicion)
+    D = getattr(Base.classes, "diccionario_competiciones", None)
+    if hasattr(F, "competicion") and D is not None:
+        rows_comp = (
+            db.session.query(D.id, D.nombre_competicion)
+            .join(F, F.competicion == D.id)
             .filter(F.competicion.isnot(None))
-            .distinct().order_by(F.competicion.asc()).all()
-        ]
+            .distinct()
+            .order_by(D.nombre_competicion.asc())
+            .all()
+        )
+        competiciones = [{"id": r[0], "nombre": r[1]} for r in rows_comp]
 
     return render_template(
         "list/jugadores.html",

@@ -120,3 +120,29 @@ h1, h2, h3 {
 }
 
 /* Filas con reconocimiento médico vencido ya usan .table-danger de Bootstrap */
+/* === Ajustes para flag-icons === */
+.fi {
+  width: 1.4em !important;
+  height: 1em !important;
+  border-radius: 2px;
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.2);
+  vertical-align: middle;
+}
+
+/* Tabla de Gestión de Futbolistas: centrado global */
+.table-jugadores th,
+.table-jugadores td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* Avatar del futbolista (columna Futbolista) */
+.jugador-avatar {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+  margin: 0 auto;
+  box-shadow: 0 0 2px rgba(0,0,0,.25);
+}
