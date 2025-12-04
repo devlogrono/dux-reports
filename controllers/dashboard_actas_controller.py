@@ -187,12 +187,15 @@ def index():
     diff_jornadas_labels = []
     diff_jornadas_values = []
 
+    # equipo_sel: selección explícita (para resaltar escudos)
+    # equipo_titulo: equipo que se muestra en el título / se usa por defecto en el gráfico
+    equipo_titulo = None
     equipo_id = None
     if competicion_sel:
         try:
             if equipo_sel:
                 sql_team = text(
-                    "SELECT DISTINCT id_equipo "
+                    "SELECT DISTINCT id_equipo, nombre_equipo "
                     "FROM competiciones "
                     "WHERE competicion = :comp "
                     "  AND nombre_equipo = :equipo "
@@ -203,10 +206,11 @@ def index():
                 ).fetchall()
             else:
                 sql_team = text(
-                    "SELECT DISTINCT id_equipo "
+                    "SELECT DISTINCT id_equipo, nombre_equipo "
                     "FROM competiciones "
                     "WHERE competicion = :comp "
                     "  AND nombre_equipo LIKE :pattern "
+                    "ORDER BY nombre_equipo ASC "
                     "LIMIT 1"
                 )
                 rows_team = db.session.execute(
@@ -215,7 +219,13 @@ def index():
 
             if rows_team:
                 equipo_id = rows_team[0][0]
-            print("[dashboard_actas] equipo_id para diff jornadas:", equipo_id)
+                # Para el título del gráfico, si hay selección explícita usamos esa;
+                # si no, usamos el nombre del equipo DUX encontrado.
+                if equipo_sel:
+                    equipo_titulo = equipo_sel
+                elif len(rows_team[0]) > 1:
+                    equipo_titulo = rows_team[0][1]
+            print("[dashboard_actas] equipo_id para diff jornadas:", equipo_id, "equipo_sel:", equipo_sel, "equipo_titulo:", equipo_titulo)
         except Exception as exc:
             print("[dashboard_actas] Error obteniendo equipo_id para diff jornadas:", exc)
 
@@ -258,4 +268,5 @@ def index():
         equipo_sel=equipo_sel,
         diff_jornadas_labels=diff_jornadas_labels,
         diff_jornadas_values=diff_jornadas_values,
+        equipo_titulo=equipo_titulo,
     )

@@ -159,7 +159,13 @@
   <div class="row g-4">
     <div class="col-12">
       <div class="dashboard-card p-3 h-100 d-flex flex-column justify-content-center align-items-center text-center">
-        <h6 class="text-uppercase text-muted small mb-2">Diferencia de goles por jornada</h6>
+        <h6 class="text-uppercase text-muted small mb-2">
+          {% if equipo_titulo %}
+            Diferencia de goles por jornada - {{ equipo_titulo }}
+          {% else %}
+            Diferencia de goles por jornada
+          {% endif %}
+        </h6>
         <div class="w-100" style="height: 280px;">
           <canvas id="chart-diff-goles"
                   data-labels='{{ diff_jornadas_labels|tojson }}'
@@ -174,20 +180,39 @@
 {% block scripts %}
   {{ super() }}
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
   <script>
   (function() {
     const el = document.getElementById('chart-diff-goles');
     if (!el) return;
     const labels = JSON.parse(el.dataset.labels || '[]');
-    const values = JSON.parse(el.dataset.values || '[]');
+    const rawValues = JSON.parse(el.dataset.values || '[]');
+    const displayValues = rawValues.map(v => v === 0 ? 0.25 : v);
     const ctx = el.getContext('2d');
 
-    const backgroundColors = values.map(v =>
+    if (!labels.length || !displayValues.length) {
+      return;
+    }
+
+    const maxVal = Math.max(...displayValues, 0);
+    const minVal = Math.min(...displayValues, 0);
+    let yMax = maxVal + 3;
+    let yMin = minVal - 3;
+    if (maxVal === 0 && minVal === 0) {
+      yMax = 2;
+      yMin = -2;
+    }
+
+    if (window.ChartDataLabels) {
+      Chart.register(ChartDataLabels);
+    }
+
+    const backgroundColors = rawValues.map(v =>
       v > 0 ? 'rgba(25, 135, 84, 0.7)' :
       v < 0 ? 'rgba(220, 53, 69, 0.7)' :
               'rgba(108, 117, 125, 0.7)'
     );
-    const borderColors = values.map(v =>
+    const borderColors = rawValues.map(v =>
       v > 0 ? '#198754' :
       v < 0 ? '#dc3545' :
               '#6c757d'
@@ -199,7 +224,7 @@
         labels: labels,
         datasets: [{
           label: 'Diferencia de goles',
-          data: values,
+          data: displayValues,
           backgroundColor: backgroundColors,
           borderColor: borderColors,
           borderWidth: 1,
@@ -210,12 +235,41 @@
         maintainAspectRatio: false,
         scales: {
           y: {
-            beginAtZero: true,
-            ticks: { stepSize: 1 }
+            display: false,
+            grid: { display: false },
+            min: yMin,
+            max: yMax
+          },
+          x: {
+            title: {
+              display: true,
+              text: 'Jornada'
+            },
+            grid: { display: false }
           }
         },
         plugins: {
-          legend: { display: false }
+          legend: { display: false },
+          datalabels: {
+            color: '#111',
+            font: {
+              weight: 'bold'
+            },
+            clamp: true,
+            formatter: (value, context) => {
+              const raw = rawValues[context.dataIndex] ?? 0;
+              return raw;
+            },
+            anchor: (context) => {
+              const raw = rawValues[context.dataIndex] ?? 0;
+              return raw >= 0 ? 'end' : 'start';
+            },
+            align: (context) => {
+              const raw = rawValues[context.dataIndex] ?? 0;
+              return raw >= 0 ? 'end' : 'start';
+            },
+            offset: 4
+          }
         }
       }
     });
