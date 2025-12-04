@@ -35,12 +35,12 @@
       </div>
 
       <div class="col-md-4">
-        <label for="sexo" class="form-label">Sexo</label>
-        <select id="sexo" name="sexo" class="form-select" {{ 'disabled' if editing }}>
-          <option value="" {% if not row or not row.sexo %}selected{% endif %}>- Seleccionar -</option>
-          <option value="M" {% if row and row.sexo=='M' %}selected{% endif %}>Masculino</option>
-          <option value="F" {% if row and row.sexo=='F' %}selected{% endif %}>Femenino</option>
-          <option value="Otro" {% if row and row.sexo=='Otro' %}selected{% endif %}>Otro</option>
+        <label for="genero" class="form-label">Género</label>
+        <select id="genero" name="genero" class="form-select" {{ 'disabled' if editing }}>
+          <option value="" {% if not row or not row.genero %}selected{% endif %}>- Seleccionar -</option>
+          <option value="M" {% if row and row.genero=='M' %}selected{% endif %}>Masculino</option>
+          <option value="F" {% if row and row.genero=='F' %}selected{% endif %}>Femenino</option>
+          <option value="Otro" {% if row and row.genero=='Otro' %}selected{% endif %}>Otro</option>
         </select>
       </div>
 

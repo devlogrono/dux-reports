@@ -68,39 +68,52 @@ def list():  # type: ignore[override]
     q = request.args.get("q", "").strip()
     competicion = request.args.get("competicion", "1FF").strip()
 
-    query = db.session.query(
+    genero_col = F.genero.label("genero")
+
+    cols = [
         F.id,
         F.nombre,
         F.apellido,
-        F.sexo,
-        F.fecha_nacimiento,
-        F.reconocimiento_medico,
-        F.id_estado,
-        getattr(F, "competicion", None).label("competicion"),
-        S.name.label("estado_nombre"),
-        getattr(I, "nacionalidad", None).label("nacionalidad"),
-        getattr(I, "posicion", None).label("posicion"),
-        getattr(I, "dorsal", None).label("dorsal"),
+        genero_col,
+    ]
+    cols.extend(
+        [
+            F.fecha_nacimiento,
+            F.reconocimiento_medico,
+            F.id_estado,
+            getattr(F, "competicion", None).label("competicion"),
+            S.name.label("estado_nombre"),
+            getattr(I, "nacionalidad", None).label("nacionalidad"),
+            getattr(I, "posicion", None).label("posicion"),
+            getattr(I, "dorsal", None).label("dorsal"),
+        ]
     )
+
+    query = db.session.query(*cols)
 
     # añade el JOIN (LEFT/OUTER para no romper si falta info):
     if I is not None:
         # usa la clave correcta según tu BD:
-        query = query.outerjoin(I, getattr(I, "id_futbolista", None) == F.id)
+        join_cond = None
+        if hasattr(I, "id_futbolista") and hasattr(F, "id"):
+            join_cond = I.id_futbolista == F.id
+        elif hasattr(I, "identificacion") and hasattr(F, "identificacion"):
+            join_cond = I.identificacion == F.identificacion
+        if join_cond is not None:
+            query = query.outerjoin(I, join_cond)
 
     # (el join con estados ya está)
     query = query.outerjoin(S, F.id_estado == S.id)
 
     if q:
         like = f"%{q}%"
-        query = query.filter(
-            or_(
-                F.nombre.ilike(like),
-                F.apellido.ilike(like),
-                F.sexo.ilike(like),
-                S.name.ilike(like),
-            )
-        )
+        filtros = [
+            F.nombre.ilike(like),
+            F.apellido.ilike(like),
+            F.genero.ilike(like),
+            S.name.ilike(like),
+        ]
+        query = query.filter(or_(*filtros))
 
     if competicion and hasattr(F, "competicion"):
         query = query.filter(F.competicion == competicion)
@@ -152,7 +165,7 @@ def list():  # type: ignore[override]
             "apellido": r.apellido,
             "dorsal": getattr(r, "dorsal", None),
             "posicion": getattr(r, "posicion", None),
-            "sexo": r.sexo,
+            "genero": r.genero,
             "edad": edad_ym(fn),
             "reconocimiento_medico": rm,     # ya es date o None
             "estado": r.estado_nombre or "",
@@ -262,13 +275,16 @@ def _form(row_id: str | None = None):
     info_row = None
     
     # Cargar información adicional si existe
-    if row_id and I:
-        info_row = db.session.query(I).filter(getattr(I, "id_futbolista", None) == row_id).first()
+    if row and I:
+        if hasattr(I, "id_futbolista"):
+            info_row = db.session.query(I).filter(I.id_futbolista == row.id).first()
+        elif hasattr(I, "identificacion") and hasattr(row, "identificacion"):
+            info_row = db.session.query(I).filter(I.identificacion == row.identificacion).first()
 
     if request.method == "POST":
         nombre = (request.form.get("nombre") or "").strip()
         apellido = (request.form.get("apellido") or "").strip()
-        sexo = (request.form.get("sexo") or "").strip()
+        genero_val = (request.form.get("genero") or "").strip()
         id_estado = request.form.get("id_estado")
         fecha_nacimiento = _parse_date(request.form.get("fecha_nacimiento"))
         reconocimiento_medico = _parse_date(request.form.get("reconocimiento_medico"))
@@ -296,12 +312,16 @@ def _form(row_id: str | None = None):
         else:
             try:
                 if not row:
-                    row = F(id=str(uuid.uuid4()))
+                    # Dejar que la BD genere el id (AUTO_INCREMENT)
+                    row = F()
                     db.session.add(row)
 
                 row.nombre = nombre
                 row.apellido = apellido
-                row.sexo = sexo or None
+                row.genero = genero_val or None
+                # Generar identificacion si la columna existe y está vacía
+                if hasattr(row, "identificacion") and not getattr(row, "identificacion", None):
+                    row.identificacion = str(uuid.uuid4())
                 row.id_estado = int(id_estado) if id_estado else None
                 row.fecha_nacimiento = fecha_nacimiento
                 row.reconocimiento_medico = reconocimiento_medico
@@ -314,7 +334,11 @@ def _form(row_id: str | None = None):
                 if I and row.id:
                     if not info_row:
                         info_row = I()
-                        setattr(info_row, "id_futbolista", row.id)
+                        # Enlazar por id_futbolista si existe, si no por identificacion
+                        if hasattr(I, "id_futbolista"):
+                            setattr(info_row, "id_futbolista", row.id)
+                        if hasattr(I, "identificacion") and hasattr(row, "identificacion"):
+                            setattr(info_row, "identificacion", row.identificacion)
                         db.session.add(info_row)
                     
                     # Actualizar campos
@@ -336,9 +360,11 @@ def _form(row_id: str | None = None):
                 else:
                     flash("Futbolista guardado", "success")
                 return redirect(url_for("jugadores.list"))
-            except IntegrityError:
+            except IntegrityError as e:
                 db.session.rollback()
-                flash("Error de integridad (posible duplicado de ID)", "danger")
+                # Mostrar el detalle real del error de BD para saber qué restricción falla
+                msg = getattr(e.orig, "args", [str(e)])[0] if getattr(e, "orig", None) else str(e)
+                flash(f"Error de integridad en BD: {msg}", "danger")
             except Exception as e:
                 db.session.rollback()
                 flash(f"Error al guardar: {str(e)}", "danger")
@@ -410,11 +436,19 @@ def edit(row_id: str):
 @require_perm("delete_jugador")
 def delete(row_id: str):
     F = _model("futbolistas")
+    I = _model("informacion_futbolistas")
     if not F:
         return "Modelo futbolistas no disponible", 500
+
     row = db.session.get(F, row_id)
     if row:
+        # Eliminar información adicional ligada al futbolista
+        if I is not None and hasattr(I, "id_futbolista"):
+            db.session.query(I).filter(I.id_futbolista == row_id).delete(synchronize_session=False)
+
+        # Eliminar el propio futbolista
         db.session.delete(row)
         db.session.commit()
         flash("Futbolista eliminado", "info")
+
     return redirect(url_for("jugadores.list"))

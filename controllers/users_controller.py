@@ -12,7 +12,7 @@ from flask import (
 )
 from flask_login import login_required
 
-from dux import db
+from dux import db, bcrypt
 from sqlalchemy import or_
 from dux.models import Base
 
@@ -107,17 +107,17 @@ def user_edit(user_id):
 def _user_form(user_id=None):
     User = _model("users")
     Role = _model("roles")
+    State = _model("state_user")
     if not User:
         return "Modelo users no disponible", 500
 
     user = db.session.get(User, user_id) if user_id else None
 
     roles = _get_choices(Role)
-    state_choices = [
-        (1, "Inactivo"),
-        (2, "Activo"),
-        (3, "Suspendido"),
-    ]
+    state_choices = []
+    if State:
+        rows = db.session.query(State.id, State.name).order_by(State.name.asc()).all()
+        state_choices = [(r.id, r.name) for r in rows]
 
     if request.method == "POST":
         email = request.form.get("email", "").strip()
@@ -143,18 +143,22 @@ def _user_form(user_id=None):
             return redirect(request.url)
 
         if user is None:
-            user = User(id=str(uuid.uuid4()))
+            # Dejar que la BD genere el id (AUTO_INCREMENT)
+            user = User()
             db.session.add(user)
+            # Generar siempre un UUID para user_id si la columna existe
+            if hasattr(user, "user_id"):
+                user.user_id = str(uuid.uuid4())
 
         user.email = email.strip().lower()
         user.name = name
         user.lastname = lastname
         user.cellular = cellular
-        user.role_id = role_id
+        user.role_id = int(role_id) if role_id else None
         user.state_id = state_id
 
         if password:
-            user.password_hash = hashlib.sha256(password.encode()).hexdigest()
+            user.password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
 
         db.session.commit()
         flash("Usuario guardado", "success")

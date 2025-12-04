@@ -13,7 +13,7 @@
     <form id="jugadoresFilterForm" class="row row-cols-lg-auto g-3 align-items-end" method="get">
       <div class="col-auto">
         <label class="form-label mb-0">Buscar</label>
-        <input type="text" name="q" class="form-control" placeholder="Filtrar por nombre, apellido, sexo o estado" value="{{ q }}">
+        <input type="text" name="q" class="form-control" placeholder="Filtrar por nombre, apellido, género o estado" value="{{ q }}">
       </div>
       <div class="col-auto">
         <label class="form-label mb-0">Equipo</label>
@@ -51,7 +51,7 @@
           {% if mostrar_nacionalidad %}
           <th class="text-center">Nacionalidad</th>
           {% endif %}
-          <th>Sexo</th>
+          <th>Género</th>
           <th>Edad</th>
           <th>Recon. médico</th>
           <th>Estado</th>
@@ -77,7 +77,7 @@
             {% endif %}
           </td>
           {% endif %}
-          <td>{{ r.sexo or '' }}</td>
+          <td>{{ r.genero or '' }}</td>
           <td>{{ r.edad }}</td>
           <td class="{% if r.vencido %}text-danger fw-semibold{% endif %}">
             {% if r.reconocimiento_medico %}{{ r.reconocimiento_medico.strftime('%d/%m/%Y') }}{% endif %}

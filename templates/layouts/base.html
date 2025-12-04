@@ -97,7 +97,9 @@
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="gestionesDropdown">
                          
-                          
+                          {% if can_mod('users') %}
+                            <li><a class="dropdown-item" href="{{ url_for('users.users_list') }}">Usuarios</a></li>
+                          {% endif %}
                             {% if can_mod('state_user') %}
                             <li><a class="dropdown-item" href="{{ url_for('state_user.state_users_list') }}">Estados de usuario</a></li>
                             {% endif %}
