@@ -183,6 +183,70 @@ def index():
     else:
         print("[dashboard_actas] Acta es None; se omiten métricas de tarjetas/goles/minutos")
 
+    # --- Diferencia de goles por jornada (bar chart) ---
+    diff_jornadas_labels = []
+    diff_jornadas_values = []
+
+    equipo_id = None
+    if competicion_sel:
+        try:
+            if equipo_sel:
+                sql_team = text(
+                    "SELECT DISTINCT id_equipo "
+                    "FROM competiciones "
+                    "WHERE competicion = :comp "
+                    "  AND nombre_equipo = :equipo "
+                    "LIMIT 1"
+                )
+                rows_team = db.session.execute(
+                    sql_team, {"comp": competicion_sel, "equipo": equipo_sel}
+                ).fetchall()
+            else:
+                sql_team = text(
+                    "SELECT DISTINCT id_equipo "
+                    "FROM competiciones "
+                    "WHERE competicion = :comp "
+                    "  AND nombre_equipo LIKE :pattern "
+                    "LIMIT 1"
+                )
+                rows_team = db.session.execute(
+                    sql_team, {"comp": competicion_sel, "pattern": "%DUX%"}
+                ).fetchall()
+
+            if rows_team:
+                equipo_id = rows_team[0][0]
+            print("[dashboard_actas] equipo_id para diff jornadas:", equipo_id)
+        except Exception as exc:
+            print("[dashboard_actas] Error obteniendo equipo_id para diff jornadas:", exc)
+
+    if equipo_id is not None:
+        try:
+            sql_j = text(
+                "SELECT jornada, id_equipo_local, id_equipo_visitante, "
+                "       goles_equipo_local, goles_equipo_visitante "
+                "FROM jornadas "
+                "WHERE id_equipo_local = :eq OR id_equipo_visitante = :eq "
+                "ORDER BY jornada ASC"
+            )
+            rows_j = db.session.execute(sql_j, {"eq": equipo_id}).fetchall()
+            print("[dashboard_actas] jornadas encontradas:", len(rows_j))
+            for r in rows_j:
+                jornada, id_loc, id_vis, g_loc, g_vis = r
+                try:
+                    g_loc = int(g_loc or 0)
+                    g_vis = int(g_vis or 0)
+                except Exception:
+                    g_loc = g_loc or 0
+                    g_vis = g_vis or 0
+                if id_loc == equipo_id:
+                    diff = g_loc - g_vis
+                else:
+                    diff = g_vis - g_loc
+                diff_jornadas_labels.append(str(jornada))
+                diff_jornadas_values.append(diff)
+        except Exception as exc:
+            print("[dashboard_actas] Error calculando diff jornadas:", exc)
+
     return render_template(
         "dashboard/actas.html",
         escudos=escudos,
@@ -192,4 +256,6 @@ def index():
         competiciones=competiciones,
         competicion_sel=competicion_sel,
         equipo_sel=equipo_sel,
+        diff_jornadas_labels=diff_jornadas_labels,
+        diff_jornadas_values=diff_jornadas_values,
     )
