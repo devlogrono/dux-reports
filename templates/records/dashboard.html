@@ -3,121 +3,14 @@
 {% block extra_css %}
 <style>
   body{
-    background: url("{{ url_for('static', filename='img/fondo8.jpg') }}") no-repeat center center fixed;
-    background-size: cover;
-  }
-
-  .dashboard-card {
-    background: rgba(255, 255, 255, 0.92);
-    border-radius: 1rem;
-    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
-    backdrop-filter: blur(6px);
-  }
-
-  .escudos-grid {
-    max-height: 260px;
-    overflow-y: auto;
-  }
-
-  .escudo-item img {
-    max-height: 80px;
-    object-fit: contain;
+    background:url("{{ url_for('static', filename='img/fondo8.jpg') }}") no-repeat center center fixed;
+    background-size:cover;
   }
 </style>
 {% endblock %}
 {% block content %}
-<div class="container-fluid py-4">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-      <h1 class="fw-semibold mb-1">Dashboard competiciones</h1>
-      <p class="text-muted mb-0 small">Explora visualmente las competiciones y sus equipos.</p>
-    </div>
-  </div>
-
-  <!-- 1) Primera fila: filtro + escudos -->
-  <div class="row g-4 mb-4">
-    <!-- Filtro de competición -->
-    <div class="col-lg-3">
-      <div class="dashboard-card p-3 h-100">
-        <h6 class="text-uppercase text-muted small mb-3">Filtro</h6>
-        <form method="get" class="mb-0">
-          <div class="mb-3">
-            <label for="competicion" class="form-label">Competición</label>
-            {% set selected_comp = competicion_sel or '3FFF' %}
-            <select id="competicion" name="competicion" class="form-select" onchange="this.form.submit()">
-              {% if not competiciones %}
-                <option value="">(Sin competiciones)</option>
-              {% else %}
-                {% for c in competiciones %}
-                  <option value="{{ c }}" {% if c == selected_comp %}selected{% endif %}>{{ c }}</option>
-                {% endfor %}
-              {% endif %}
-            </select>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- Grid de escudos -->
-    <div class="col-lg-9">
-      <div class="dashboard-card p-3 h-100">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h6 class="text-uppercase text-muted small mb-0">Escudos de la competición</h6>
-          <span class="badge bg-light text-dark small">{{ escudos|length }} equipos</span>
-        </div>
-        <div class="escudos-grid">
-          {% if escudos %}
-            <div class="row g-3">
-              {% for url in escudos %}
-                <div class="col-6 col-sm-4 col-md-3 col-lg-2">
-                  <div class="escudo-item text-center p-2 bg-white rounded-3 shadow-sm h-100">
-                    <img src="{{ url }}" alt="Escudo {{ loop.index }}" class="img-fluid mb-1">
-                  </div>
-                </div>
-              {% endfor %}
-            </div>
-          {% else %}
-            <div class="text-center text-muted py-5">
-              <p class="mb-1">No se han encontrado escudos para esta competición.</p>
-              <p class="small mb-0">Prueba a seleccionar otra competición en el filtro de la izquierda.</p>
-            </div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 2) Segunda fila: 3 contenedores para plots -->
-  <div class="row g-4 mb-4">
-    <div class="col-lg-4">
-      <div class="dashboard-card p-3 h-100 d-flex flex-column justify-content-center align-items-center text-center">
-        <h6 class="text-uppercase text-muted small mb-2">Plot 1</h6>
-        <p class="mb-0 text-muted small">Placeholder para gráfico 1.</p>
-      </div>
-    </div>
-    <div class="col-lg-4">
-      <div class="dashboard-card p-3 h-100 d-flex flex-column justify-content-center align-items-center text-center">
-        <h6 class="text-uppercase text-muted small mb-2">Plot 2</h6>
-        <p class="mb-0 text-muted small">Placeholder para gráfico 2.</p>
-      </div>
-    </div>
-    <div class="col-lg-4">
-      <div class="dashboard-card p-3 h-100 d-flex flex-column justify-content-center align-items-center text-center">
-        <h6 class="text-uppercase text-muted small mb-2">Plot 3</h6>
-        <p class="mb-0 text-muted small">Placeholder para gráfico 3.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- 3) Tercera fila: único plot -->
-  <div class="row g-4">
-    <div class="col-12">
-      <div class="dashboard-card p-3 h-100 d-flex flex-column justify-content-center align-items-center text-center">
-        <h6 class="text-uppercase text-muted small mb-2">Plot global</h6>
-        <p class="mb-0 text-muted small">Placeholder para gráfico principal.</p>
-      </div>
-    </div>
-  </div>
+<div class="d-flex justify-content-center align-items-center" style="min-height:60vh;">
+    <h1 class="fw-semibold text-center" style="font-size:2.8rem;">Bienvenido al <br>Sistema Integral de Gestión</h1>
 </div>
-
+    
 {% endblock %}

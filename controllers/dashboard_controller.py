@@ -52,57 +52,10 @@ def dashboard_home():
             .count()
         )
 
-    # --- Competiciones y escudos ---
-    competiciones = []
-    escudos = []
-
-    # Valor seleccionado por querystring, por defecto "3FFF"
-    competicion_sel = request.args.get("competicion") or "3FFF"
-
-    Comp = _get_model("competiciones")
-    if Comp is not None:
-        table = Comp.__table__
-        # Columnas esperadas en la tabla de competiciones
-        comp_col = table.c.get("competicion")
-        escudo_col = table.c.get("url_escudo_equipo") or table.c.get("url_escudo_equipo_local")
-
-        # Lista de competiciones únicas ordenadas alfabéticamente
-        if comp_col is not None:
-            rows_comp = (
-                db.session.query(comp_col)
-                .filter(comp_col.isnot(None), comp_col != "")
-                .distinct()
-                .order_by(comp_col.asc())
-                .all()
-            )
-            competiciones = [r[0] for r in rows_comp]
-
-            # Asegurar que la selección por defecto sea coherente
-            if competicion_sel not in competiciones and competiciones:
-                competicion_sel = competiciones[0]
-
-        # Escudos de la competición seleccionada
-        if escudo_col is not None and comp_col is not None and competicion_sel:
-            rows_esc = (
-                db.session.query(escudo_col)
-                .filter(
-                    comp_col == competicion_sel,
-                    escudo_col.isnot(None),
-                    escudo_col != "",
-                )
-                .distinct()
-                .order_by(escudo_col.asc())
-                .all()
-            )
-            escudos = [r[0] for r in rows_esc]
-
     return render_template(
         "records/dashboard.html",
         prescriptores_activos=prescriptores_activos,
         leads_matriculados=leads_matriculados,
-        competiciones=competiciones,
-        competicion_sel=competicion_sel,
-        escudos=escudos,
     )
 
 
