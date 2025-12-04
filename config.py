@@ -15,9 +15,9 @@ class Config:
     # SQLALCHEMY_ECHO = False
 
     # Cadena de conexión a RDS
+    # Nota: en producción es recomendable mover esta URI a una variable de entorno
     SQLALCHEMY_DATABASE_URI = (
-        os.getenv("SQLALCHEMY_DATABASE_URI")
-        or "mysql+pymysql://admin:<PASSWORD>@dpe.cl0glysfjbui.eu-west-1.rds.amazonaws.com:3306/db_dux"
+        "mysql+pymysql://admin:dpeQwertyuiop135790_!#@dbdux.cd2ay8iog7ao.eu-north-1.rds.amazonaws.com:3306/db_dux"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 

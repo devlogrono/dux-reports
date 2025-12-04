@@ -1,10 +1,168 @@
 {% extends 'layouts/base.html' %}
 {% block title %}Dashboard · Actas{% endblock %}
+{% block extra_css %}
+<style>
+  body{
+    background: url("{{ url_for('static', filename='img/fondo8.jpg') }}") no-repeat center center fixed;
+    background-size: cover;
+  }
+
+  .dashboard-card {
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 1rem;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+    backdrop-filter: blur(6px);
+  }
+
+  .escudos-grid {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0.5rem 0;
+  }
+
+  .escudos-strip {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .escudo-item {
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .escudo-item img {
+    height: var(--escudo-size, 60px);
+    width: auto;
+    object-fit: contain;
+    transition: transform 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+  }
+
+  .filter-card {
+    padding-top: 0.4rem !important;
+    padding-bottom: 0.4rem !important;
+  }
+
+  #competicion.form-select {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    font-size: 0.85rem;
+  }
+
+  .escudo-selected img {
+    opacity: 1;
+    filter: drop-shadow(0 0 8px rgba(15, 23, 42, 0.4));
+    transform: scale(1.06);
+  }
+
+  .escudo-dim img {
+    opacity: 0.35;
+    filter: grayscale(70%);
+  }
+
+  .escudos-strip a {
+    text-decoration: none;
+  }
+
+  .escudo-item:hover img {
+    opacity: 1;
+    filter: grayscale(0);
+    transform: scale(1.08);
+  }
+</style>
+{% endblock %}
 {% block content %}
-<div class="card shadow-sm">
-  <div class="card-body">
-    <h5 class="mb-3">Actas</h5>
-    <div class="text-muted py-5 text-center border rounded-3">(Contenido próximamente)</div>
+<div class="container-fluid py-4">
+  <div class="row g-4 mb-4 align-items-center">
+    <div class="col-auto" style="min-width: 120px; max-width: 200px;">
+      <div class="dashboard-card filter-card p-2">
+        <form method="get" class="mb-0">
+          <div class="mb-0">
+            <label for="competicion" class="form-label mb-1">Competición</label>
+            {% set selected_comp = competicion_sel or '3FFF' %}
+            <select id="competicion" name="competicion" class="form-select" onchange="this.form.submit()">
+              {% if not competiciones %}
+                <option value="">(Sin competiciones)</option>
+              {% else %}
+                {% for c in competiciones %}
+                  <option value="{{ c }}" {% if c == selected_comp %}selected{% endif %}>{{ c }}</option>
+                {% endfor %}
+              {% endif %}
+            </select>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="dashboard-card p-3 h-100">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="text-uppercase text-muted small mb-0">Equipos</h6>
+          <span class="badge bg-light text-dark small">{{ escudos|length }} equipos</span>
+        </div>
+        {% set n_escudos = escudos|length %}
+        {% if n_escudos %}
+          {% set escudo_size = 90 if n_escudos <= 8 else 70 if n_escudos <= 16 else 55 if n_escudos <= 24 else 45 %}
+          <div class="escudos-grid" style="--escudo-size: {{ escudo_size }}px;">
+            <div class="escudos-strip">
+              {% for e in escudos %}
+                {% set is_selected = equipo_sel and e.nombre == equipo_sel %}
+                <div class="escudo-item {{ 'escudo-selected' if is_selected else ('escudo-dim' if equipo_sel else '') }}">
+                  <a href="{{ url_for('dashboard_actas.index', competicion=competicion_sel) if is_selected else url_for('dashboard_actas.index', competicion=competicion_sel, equipo=e.nombre) }}"
+                     title="{{ e.nombre or '' }}">
+                    <img src="{{ e.url }}"
+                         alt="{{ e.nombre or ('Escudo ' ~ loop.index) }}"
+                         class="img-fluid">
+                  </a>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% else %}
+            <div class="text-center text-muted py-5">
+              <p class="mb-1">No se han encontrado escudos para esta competición.</p>
+              <p class="small mb-0">Comprueba que la tabla <code>competiciones</code> tiene datos y que la columna de escudos está informada.</p>
+            </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-4">
+      <div class="dashboard-card p-3 h-100 d-flex flex-column justify-content-center align-items-center text-center">
+        <h6 class="text-uppercase text-muted small mb-2">Plot 1</h6>
+        <p class="mb-0 text-muted small">Placeholder para gráfico 1.</p>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="dashboard-card p-3 h-100 d-flex flex-column justify-content-center align-items-center text-center">
+        <h6 class="text-uppercase text-muted small mb-2">Plot 2</h6>
+        <p class="mb-0 text-muted small">Placeholder para gráfico 2.</p>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="dashboard-card p-3 h-100 d-flex flex-column justify-content-center align-items-center text-center">
+        <h6 class="text-uppercase text-muted small mb-2">Plot 3</h6>
+        <p class="mb-0 text-muted small">Placeholder para gráfico 3.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12">
+      <div class="dashboard-card p-3 h-100 d-flex flex-column justify-content-center align-items-center text-center">
+        <h6 class="text-uppercase text-muted small mb-2">Plot global</h6>
+        <p class="mb-0 text-muted small">Placeholder para gráfico principal.</p>
+      </div>
+    </div>
   </div>
 </div>
 {% endblock %}
