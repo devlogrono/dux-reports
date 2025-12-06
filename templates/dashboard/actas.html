@@ -80,28 +80,71 @@
 {% endblock %}
 {% block content %}
 <div class="container-fluid py-4">
-  <div class="row g-4 mb-4 align-items-center">
-    <div class="col-auto" style="min-width: 120px; max-width: 200px;">
-      <div class="dashboard-card filter-card p-2">
-        <form method="get" class="mb-0">
-          <div class="mb-0">
-            <label for="competicion" class="form-label mb-1">Competición</label>
-            {% set selected_comp = competicion_sel or '3FFF' %}
-            <select id="competicion" name="competicion" class="form-select" onchange="this.form.submit()">
-              {% if not competiciones %}
-                <option value="">(Sin competiciones)</option>
-              {% else %}
-                {% for c in competiciones %}
-                  <option value="{{ c }}" {% if c == selected_comp %}selected{% endif %}>{{ c }}</option>
-                {% endfor %}
-              {% endif %}
-            </select>
+  <div class="row g-4 mb-4 align-items-stretch">
+    <div class="col-lg-3 col-md-4">
+      <div class="d-flex flex-column h-100 gap-3">
+        <div class="dashboard-card filter-card p-2">
+          <form method="get" class="mb-0">
+            <div class="mb-0">
+              <label for="competicion" class="form-label mb-1">Competición</label>
+              {% set selected_comp = competicion_sel or '3FFF' %}
+              <select id="competicion" name="competicion" class="form-select" onchange="this.form.submit()">
+                {% if not competiciones %}
+                  <option value="">(Sin competiciones)</option>
+                {% else %}
+                  {% for c in competiciones %}
+                    <option value="{{ c.id }}" {% if c.id == selected_comp %}selected{% endif %}>{{ c.nombre }}</option>
+                  {% endfor %}
+                {% endif %}
+              </select>
+            </div>
+          </form>
+        </div>
+
+        <div class="dashboard-card p-3 d-flex flex-column justify-content-center">
+          <div class="row text-center g-2">
+            <div class="col-4 col-md-2" title="Victorias">
+              <div class="mb-1">
+                <span class="badge rounded-circle bg-success">V</span>
+              </div>
+              <div class="fw-bold">{{ victorias_total or 0 }}</div>
+            </div>
+            <div class="col-4 col-md-2" title="Empates">
+              <div class="mb-1">
+                <span class="badge rounded-circle bg-secondary">E</span>
+              </div>
+              <div class="fw-bold">{{ empates_total or 0 }}</div>
+            </div>
+            <div class="col-4 col-md-2" title="Derrotas">
+              <div class="mb-1">
+                <span class="badge rounded-circle bg-danger">D</span>
+              </div>
+              <div class="fw-bold">{{ derrotas_total or 0 }}</div>
+            </div>
+            <div class="col-4 col-md-2" title="Goles a favor">
+              <div class="mb-1">
+                <span class="badge rounded-circle bg-success">GF</span>
+              </div>
+              <div class="fw-bold">{{ goles_favor_total or 0 }}</div>
+            </div>
+            <div class="col-4 col-md-2" title="Goles en contra">
+              <div class="mb-1">
+                <span class="badge rounded-circle bg-danger">GC</span>
+              </div>
+              <div class="fw-bold">{{ goles_contra_total or 0 }}</div>
+            </div>
+            <div class="col-4 col-md-2" title="Tarjetas (amarillas + rojas)">
+              <div class="mb-1">
+                <span class="badge rounded-circle bg-warning text-dark">T</span>
+              </div>
+              <div class="fw-bold">{{ total_tarjetas_equipo or 0 }}</div>
+            </div>
           </div>
-        </form>
+        </div>
       </div>
     </div>
 
-    <div class="col">
+    <div class="col-lg-9 col-md-8">
       <div class="dashboard-card p-3 h-100">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h6 class="text-uppercase text-muted small mb-0">Equipos</h6>
@@ -137,21 +180,87 @@
 
   <div class="row g-4 mb-4">
     <div class="col-lg-4">
-      <div class="dashboard-card p-3 h-100 d-flex flex-column justify-content-center align-items-center text-center">
-        <h6 class="text-uppercase text-muted small mb-2">Plot 1</h6>
-        <p class="mb-0 text-muted small">Placeholder para gráfico 1.</p>
+      <div class="dashboard-card p-3 h-100 d-flex flex-column">
+        <h6 class="text-uppercase text-muted small mb-2">Tarjetas</h6>
+        {% if tarjetas %}
+          {% set max_total = max_tarjetas_total or 0 %}
+          <div class="w-100" style="max-height: 260px; overflow-y: auto;">
+            {% for t in tarjetas %}
+              {% set amar = t.amarillas %}
+              {% set roj = t.rojas %}
+              {% if amar > 0 and roj == 0 %}
+                {% set barra_color = 'rgba(241,196,15,0.7)' %}
+              {% elif amar == 0 and roj > 0 %}
+                {% set barra_color = 'rgba(220,53,69,0.65)' %}
+              {% elif amar >= roj %}
+                {% set barra_color = 'rgba(241,196,15,0.7)' %}
+              {% else %}
+                {% set barra_color = 'rgba(220,53,69,0.65)' %}
+              {% endif %}
+
+              <div class="d-flex justify-content-between align-items-center mb-1 small"
+                   style="background-color: {{ barra_color }}; border-radius: 4px; padding: 4px 8px;">
+                <span class="text-start text-wrap" style="flex:1; text-align:left;">{{ t.jugador }}</span>
+                <div class="d-flex align-items-center gap-1 ms-2">
+                  {% if t.amarillas %}
+                    <span class="fw-bold px-1" style="color: #000;">
+                      {{ t.amarillas }}
+                    </span>
+                  {% endif %}
+                  {% if t.rojas %}
+                    <span class="fw-bold px-1" style="color: #000;">
+                      {{ t.rojas }}
+                    </span>
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="mb-0 text-muted small">Sin datos de tarjetas.</p>
+        {% endif %}
       </div>
     </div>
     <div class="col-lg-4">
-      <div class="dashboard-card p-3 h-100 d-flex flex-column justify-content-center align-items-center text-center">
-        <h6 class="text-uppercase text-muted small mb-2">Plot 2</h6>
-        <p class="mb-0 text-muted small">Placeholder para gráfico 2.</p>
+      <div class="dashboard-card p-3 h-100 d-flex flex-column">
+        <h6 class="text-uppercase text-muted small mb-2">Goles</h6>
+        {% if goles %}
+          {% set max_goles = goles | map(attribute='valor') | max %}
+          <div class="w-100" style="max-height: 260px; overflow-y: auto;">
+            {% for g in goles %}
+              {% set intensity = (g.valor / max_goles) if max_goles else 0 %}
+              {% set alpha = 0.15 + 0.65 * intensity %}
+              <div class="d-flex justify-content-between align-items-center mb-1 small"
+                   style="background-color: rgba(220,53,69, {{ alpha }}); border-radius: 4px; padding: 4px 8px;">
+                <span class="text-start text-wrap" style="flex:1; text-align:left;">{{ g.jugador }}</span>
+                <span class="fw-bold ms-2">{{ g.valor }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="mb-0 text-muted small">Sin datos de goles.</p>
+        {% endif %}
       </div>
     </div>
     <div class="col-lg-4">
-      <div class="dashboard-card p-3 h-100 d-flex flex-column justify-content-center align-items-center text-center">
-        <h6 class="text-uppercase text-muted small mb-2">Plot 3</h6>
-        <p class="mb-0 text-muted small">Placeholder para gráfico 3.</p>
+      <div class="dashboard-card p-3 h-100 d-flex flex-column">
+        <h6 class="text-uppercase text-muted small mb-2">Minutos</h6>
+        {% if minutos %}
+          {% set max_minutos = minutos | map(attribute='valor') | max %}
+          <div class="w-100" style="max-height: 260px; overflow-y: auto;">
+            {% for m in minutos %}
+              {% set intensity = (m.valor / max_minutos) if max_minutos else 0 %}
+              {% set alpha = 0.15 + 0.65 * intensity %}
+              <div class="d-flex justify-content-between align-items-center mb-1 small"
+                   style="background-color: rgba(220,53,69, {{ alpha }}); border-radius: 4px; padding: 4px 8px;">
+                <span class="text-start text-wrap" style="flex:1; text-align:left;">{{ m.jugador }}</span>
+                <span class="fw-bold ms-2">{{ m.valor }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="mb-0 text-muted small">Sin datos de minutos.</p>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -182,6 +291,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
   <script>
+  // Gráfico de diferencia de goles por jornada
   (function() {
     const el = document.getElementById('chart-diff-goles');
     if (!el) return;
@@ -274,5 +384,5 @@
       }
     });
   })();
-  </script>
+</script>
 {% endblock %}

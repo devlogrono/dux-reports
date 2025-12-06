@@ -12,6 +12,7 @@ def index():
     # Modelos reflejados
     Comp = getattr(Base.classes, "competiciones", None)
     Acta = getattr(Base.classes, "actas", None)
+    DiccComp = getattr(Base.classes, "diccionario_competiciones", None)
 
     # Debug: qué clases ha reflejado automap
     try:
@@ -71,15 +72,35 @@ def index():
         print("[dashboard_actas] competiciones sin 1FF:", raw_competiciones)
 
     orden_preferido = ["3FFF", "1J", "1C", "CFF", "1I", "IFF"]
+    ordered_codes = []
     if raw_competiciones:
-        competiciones = [c for c in orden_preferido if c in raw_competiciones] + sorted(
+        ordered_codes = [c for c in orden_preferido if c in raw_competiciones] + sorted(
             [c for c in raw_competiciones if c not in orden_preferido]
         )
+
+    # Construir lista de competiciones con id (código) y nombre legible
+    if ordered_codes:
+        name_map = {}
+        if DiccComp is not None:
+            try:
+                rows_dicc = (
+                    db.session.query(DiccComp.id, DiccComp.nombre_competicion)
+                    .filter(DiccComp.id.in_(ordered_codes))
+                    .all()
+                )
+                name_map = {r[0]: (r[1] or r[0]) for r in rows_dicc}
+            except Exception as exc:
+                print("[dashboard_actas] Error leyendo diccionario_competiciones:", exc)
+
+        competiciones = [
+            {"id": code, "nombre": name_map.get(code, code)} for code in ordered_codes
+        ]
+
     print("[dashboard_actas] competiciones tras ordenar:", competiciones)
 
     competicion_sel = request.args.get("competicion") or "3FFF"
-    if competiciones and competicion_sel not in competiciones:
-        competicion_sel = competiciones[0]
+    if competiciones and competicion_sel not in [c["id"] for c in competiciones]:
+        competicion_sel = competiciones[0]["id"]
     equipo_sel = request.args.get("equipo") or None
     print("[dashboard_actas] competicion_sel final:", competicion_sel, "equipo_sel:", equipo_sel)
 
@@ -156,6 +177,13 @@ def index():
     tarjetas = []
     goles = []
     minutos = []
+    max_tarjetas_total = 0
+    goles_favor_total = 0
+    goles_contra_total = 0
+    total_tarjetas_equipo = 0
+    victorias_total = 0
+    empates_total = 0
+    derrotas_total = 0
 
     if Acta is not None:
         # -------- Tarjetas (Jugador, TA, TR) --------
@@ -248,14 +276,151 @@ def index():
                 except Exception:
                     g_loc = g_loc or 0
                     g_vis = g_vis or 0
+
                 if id_loc == equipo_id:
-                    diff = g_loc - g_vis
+                    gf = g_loc
+                    gc = g_vis
                 else:
-                    diff = g_vis - g_loc
+                    gf = g_vis
+                    gc = g_loc
+
+                diff = gf - gc
+                goles_favor_total += gf
+                goles_contra_total += gc
+
+                # Contar victorias, empates y derrotas
+                if gf > gc:
+                    victorias_total += 1
+                elif gf < gc:
+                    derrotas_total += 1
+                else:
+                    empates_total += 1
+
                 diff_jornadas_labels.append(str(jornada))
                 diff_jornadas_values.append(diff)
         except Exception as exc:
             print("[dashboard_actas] Error calculando diff jornadas:", exc)
+
+    # --- Estadísticas agregadas por jugador (actas filtradas por jornadas) ---
+    if equipo_id is not None:
+        rows_stats = []
+        try:
+            # Intento con filtro de competición en jornadas
+            sql_stats = text(
+                "SELECT a.jugador, "
+                "       COALESCE(SUM(a.goles), 0) AS goles, "
+                "       COALESCE(SUM(a.minutos), 0) AS minutos, "
+                "       COALESCE(SUM(a.tarjetas_amarillas), 0) AS ta, "
+                "       COALESCE(SUM(a.tarjetas_rojas), 0) AS tr "
+                "FROM jornadas j "
+                "JOIN actas a ON a.acta_id = j.acta_id "
+                "WHERE (j.id_equipo_local = :eq OR j.id_equipo_visitante = :eq) "
+                "  AND j.competicion = :comp "
+                "GROUP BY a.jugador"
+            )
+            rows_stats = db.session.execute(
+                sql_stats, {"eq": equipo_id, "comp": competicion_sel}
+            ).fetchall()
+        except Exception as exc:
+            print(
+                "[dashboard_actas] Error leyendo stats actas con competicion en jornadas, reintentando sin competicion:",
+                exc,
+            )
+            try:
+                sql_stats = text(
+                    "SELECT a.jugador, "
+                    "       COALESCE(SUM(a.goles), 0) AS goles, "
+                    "       COALESCE(SUM(a.minutos), 0) AS minutos, "
+                    "       COALESCE(SUM(a.tarjetas_amarillas), 0) AS ta, "
+                    "       COALESCE(SUM(a.tarjetas_rojas), 0) AS tr "
+                    "FROM jornadas j "
+                    "JOIN actas a ON a.acta_id = j.acta_id "
+                    "WHERE j.id_equipo_local = :eq OR j.id_equipo_visitante = :eq "
+                    "GROUP BY a.jugador"
+                )
+                rows_stats = db.session.execute(
+                    sql_stats, {"eq": equipo_id}
+                ).fetchall()
+            except Exception as exc2:
+                print("[dashboard_actas] Error leyendo stats actas sin competicion:", exc2)
+                rows_stats = []
+
+        if rows_stats:
+            stats = []
+            for r in rows_stats:
+                jugador = r[0]
+                goles_val = r[1] or 0
+                minutos_val = r[2] or 0
+                ta_val = r[3] or 0
+                tr_val = r[4] or 0
+                stats.append(
+                    {
+                        "jugador": jugador,
+                        "goles": int(goles_val),
+                        "minutos": int(minutos_val),
+                        "amarillas": int(ta_val),
+                        "rojas": int(tr_val),
+                    }
+                )
+
+            # Tarjetas: lista de jugadores con amarillas/rojas, ordenada por total desc
+            tarjetas = [
+                {
+                    "jugador": s["jugador"],
+                    "amarillas": s["amarillas"],
+                    "rojas": s["rojas"],
+                }
+                for s in stats
+                if s["amarillas"] or s["rojas"]
+            ]
+
+            # Orden: 1) mayor total (amarillas+rojas), 2) más rojas, 3) nombre A-Z
+            tarjetas.sort(
+                key=lambda x: (
+                    -(x["amarillas"] + x["rojas"]),
+                    -x["rojas"],
+                    (x["jugador"] or ""),
+                )
+            )
+
+            try:
+                max_tarjetas_total = max(
+                    (t["amarillas"] + t["rojas"] for t in tarjetas),
+                    default=0,
+                )
+            except Exception:
+                max_tarjetas_total = 0
+
+            total_tarjetas_equipo = sum(
+                (t["amarillas"] + t["rojas"] for t in tarjetas),
+                0,
+            )
+
+            # Goles: lista de {jugador, valor} ordenada por valor desc y nombre asc
+            goles = [
+                {"jugador": s["jugador"], "valor": s["goles"]}
+                for s in stats
+                if s["goles"]
+            ]
+            goles.sort(
+                key=lambda x: (
+                    -(x["valor"] or 0),
+                    (x["jugador"] or ""),
+                )
+            )
+
+            # Minutos: lista de {jugador, valor} ordenada por valor desc y nombre asc
+            minutos = [
+                {"jugador": s["jugador"], "valor": s["minutos"]}
+                for s in stats
+                if s["minutos"]
+            ]
+            minutos.sort(
+                key=lambda x: (
+                    -(x["valor"] or 0),
+                    (x["jugador"] or ""),
+                )
+            )
 
     return render_template(
         "dashboard/actas.html",
@@ -269,4 +434,11 @@ def index():
         diff_jornadas_labels=diff_jornadas_labels,
         diff_jornadas_values=diff_jornadas_values,
         equipo_titulo=equipo_titulo,
+        max_tarjetas_total=max_tarjetas_total,
+        goles_favor_total=goles_favor_total,
+        goles_contra_total=goles_contra_total,
+        total_tarjetas_equipo=total_tarjetas_equipo,
+        victorias_total=victorias_total,
+        empates_total=empates_total,
+        derrotas_total=derrotas_total,
     )
