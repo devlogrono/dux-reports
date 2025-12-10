@@ -1,0 +1,161 @@
+{% extends "layouts/base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>Dashboard Futbolistas</h1>
+
+    {# Tabs locales (aquí no preservamos filtros de jugadoras, pero sí marcamos activo) #}
+    {% set ns = namespace(qs=[]) %}
+    {% if equipo_seleccionado %}{% set ns.qs = ns.qs + ['equipo=' ~ equipo_seleccionado|urlencode] %}{% endif %}
+    {% if jornada_seleccionada %}{% set ns.qs = ns.qs + ['jornada=' ~ jornada_seleccionada] %}{% endif %}
+    {% if lv_seleccionado %}{% set ns.qs = ns.qs + ['lv=' ~ lv_seleccionado] %}{% endif %}
+    {% set qstr = '?' ~ ns.qs|join('&') if ns.qs else '' %}
+
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.index' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.index') }}">Participaciones</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.caracteristicas' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.caracteristicas') }}">Características</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.estadisticas' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.estadisticas') }}">Estadísticas</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.analisis_equipo' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.analisis_equipo') }}">Análisis equipo</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.sustituciones' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.sustituciones') }}{{ qstr }}">Sustituciones</a>
+        </li>
+    </ul>
+
+    <h2 class="mb-4">Análisis de las sustituciones por equipo</h2>
+
+    {# Filtros #}
+    <form method="get" class="row g-3 align-items-end mb-4">
+        <div class="col-md-4">
+            <label>Equipo:</label>
+            <select name="equipo" class="form-select">
+                <option value="">(Todos)</option>
+                {% for e in equipos %}
+                    <option value="{{ e }}" {% if e == equipo_seleccionado %}selected{% endif %}>{{ e }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label>Jornada:</label>
+            <select name="jornada" class="form-select">
+                <option value="">(Todas)</option>
+                {% for j in jornadas %}
+                    <option value="{{ j }}" {% if j == jornada_seleccionada %}selected{% endif %}>{{ j }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label>Local/Visitante:</label>
+            <select name="lv" class="form-select">
+                <option value="">(Todos)</option>
+                <option value="L" {% if lv_seleccionado == 'L' %}selected{% endif %}>Local</option>
+                <option value="V" {% if lv_seleccionado == 'V' %}selected{% endif %}>Visitante</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-grid">
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+        </div>
+    </form>
+
+    {# Métricas principales #}
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle text-muted mb-2">Minuto medio sustitución</h6>
+                    <h3 class="card-title">{{ minuto_medio or '-' }}'</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle text-muted mb-2">Minuto medio primera sustitución</h6>
+                    <h3 class="card-title">{{ minuto_medio_primera or '-' }}'</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle text-muted mb-2">Minuto medio última sustitución</h6>
+                    <h3 class="card-title">{{ minuto_medio_ultima or '-' }}'</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle text-muted mb-2">Número medio de sustituciones</h6>
+                    <h3 class="card-title">{{ num_medio_sustituciones or '-' }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Tops #}
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Top sustituciones más repetidas</h5>
+                    <ul class="mb-0">
+                        {% for row in top_parejas %}
+                            <li>{{ row.sale }} → {{ row.entra }} ({{ row.n }})</li>
+                        {% endfor %}
+                        {% if not top_parejas %}
+                            <li class="text-muted">Sin datos para los filtros seleccionados.</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Top jugadores sustituidos</h5>
+                    <ul class="mb-0">
+                        {% for row in top_sustituidos %}
+                            <li>{{ row.sale }} ({{ row.n }})</li>
+                        {% endfor %}
+                        {% if not top_sustituidos %}
+                            <li class="text-muted">Sin datos para los filtros seleccionados.</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Top minutos desde el banquillo</h5>
+                    <ul class="mb-0">
+                        {% for row in top_banquillo %}
+                            <li>{{ row.jugador }} ({{ row.minutos }} min)</li>
+                        {% endfor %}
+                        {% if not top_banquillo %}
+                            <li class="text-muted">Sin datos para los filtros seleccionados.</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Aquí más adelante podemos sumar gráficos con distribucion_minuto y cambios_por_jornada #}
+</div>
+{% endblock %}

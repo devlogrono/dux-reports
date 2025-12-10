@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request
 from flask_login import login_required
 from sqlalchemy import text
+from collections import Counter
 from dux import db
 
 bp = Blueprint("dashboard_futbolistas", __name__, url_prefix="/dashboard/futbolistas")
@@ -384,3 +385,202 @@ def analisis_equipo():
         per_jugador=per_jugador,
         kpis=kpis,
     )
+
+@bp.get("/sustituciones")
+@login_required
+def sustituciones():
+    """Análisis de las sustituciones por equipo (minutos, top combos, etc.)."""
+
+    # --- Filtros desde la URL ---
+    equipo = request.args.get("equipo") or None
+    jornada = request.args.get("jornada", type=int)
+    lv = request.args.get("lv") or None   # 'L', 'V' o None
+
+    # --- Opciones para los filtros (equipos, jornadas) ---
+    sql_equipos = "SELECT DISTINCT equipo FROM sustituciones WHERE equipo IS NOT NULL ORDER BY equipo"
+    equipos = [r[0] for r in db.session.execute(text(sql_equipos))]
+
+    sql_jornadas = "SELECT DISTINCT jornada FROM jornadas WHERE jornada IS NOT NULL ORDER BY jornada"
+    jornadas = [r[0] for r in db.session.execute(text(sql_jornadas))]
+
+    # --- Query base: sustituciones + jornada + condición local/visitante ---
+    sql_base = """
+        SELECT
+            s.acta_id,
+            s.equipo,
+            s.sale,
+            s.entra,
+            s.minuto,
+            j.jornada,
+            CASE
+                WHEN s.equipo = cl.nombre_equipo THEN 'L'
+                WHEN s.equipo = cv.nombre_equipo THEN 'V'
+                ELSE NULL
+            END AS condicion_lv
+        FROM sustituciones s
+        LEFT JOIN jornadas j
+            ON s.acta_id = j.acta_id
+        LEFT JOIN competiciones cl
+            ON j.id_equipo_local = cl.id_equipo
+        LEFT JOIN competiciones cv
+            ON j.id_equipo_visitante = cv.id_equipo
+        WHERE 1 = 1
+    """
+    params = {}
+
+    if equipo:
+        sql_base += " AND s.equipo = :equipo"
+        params["equipo"] = equipo
+
+    if jornada is not None:
+        sql_base += " AND j.jornada = :jornada"
+        params["jornada"] = jornada
+
+    if lv in ("L", "V"):
+        sql_base += """
+            AND CASE
+                    WHEN s.equipo = cl.nombre_equipo THEN 'L'
+                    WHEN s.equipo = cv.nombre_equipo THEN 'V'
+                END = :lv
+        """
+        params["lv"] = lv
+
+    rows = db.session.execute(text(sql_base), params).mappings().all()
+
+    # Si no hay datos, devolvemos algo vacío pero sin romper el template
+    if not rows:
+        context = {
+            "equipos": equipos,
+            "jornadas": jornadas,
+            "equipo_seleccionado": equipo,
+            "jornada_seleccionada": jornada,
+            "lv_seleccionado": lv,
+            "minuto_medio": None,
+            "minuto_medio_primera": None,
+            "minuto_medio_ultima": None,
+            "num_medio_sustituciones": None,
+            "distribucion_minuto": [],
+            "cambios_por_jornada": [],
+            "top_parejas": [],
+            "top_sustituidos": [],
+            "top_banquillo": [],
+        }
+        return render_template("dashboard/sustituciones.html", **context)
+
+    # --- Métricas principales en Python ---
+    minutos = [r["minuto"] for r in rows if r["minuto"] is not None]
+
+    minuto_medio = round(sum(minutos) / len(minutos)) if minutos else None
+
+    # Agrupación por acta para primera/última y nº de cambios
+    por_acta = {}
+    for r in rows:
+        acta_id = r["acta_id"]
+        m = r["minuto"] or 0
+        if acta_id not in por_acta:
+            por_acta[acta_id] = {"count": 1, "min": m, "max": m}
+        else:
+            por_acta[acta_id]["count"] += 1
+            por_acta[acta_id]["min"] = min(por_acta[acta_id]["min"], m)
+            por_acta[acta_id]["max"] = max(por_acta[acta_id]["max"], m)
+
+    if por_acta:
+        minuto_medio_primera = round(
+            sum(v["min"] for v in por_acta.values()) / len(por_acta)
+        )
+        minuto_medio_ultima = round(
+            sum(v["max"] for v in por_acta.values()) / len(por_acta)
+        )
+        num_medio_sustituciones = round(
+            sum(v["count"] for v in por_acta.values()) / len(por_acta), 1
+        )
+    else:
+        minuto_medio_primera = minuto_medio_ultima = num_medio_sustituciones = None
+
+    # Distribución por minuto
+    dist_counter = Counter(minutos)
+    distribucion_minuto = [
+        {"minuto": m, "n": dist_counter[m]} for m in sorted(dist_counter.keys())
+    ]
+
+    # Número de cambios por jornada
+    jornadas_counter = Counter(r["jornada"] for r in rows if r["jornada"] is not None)
+    cambios_por_jornada = [
+        {"jornada": j, "n": jornadas_counter[j]} for j in sorted(jornadas_counter.keys())
+    ]
+
+    # Top 5 sustituciones (sale -> entra)
+    pareja_counter = Counter((r["sale"], r["entra"]) for r in rows)
+    top_parejas = []
+    for (sale, entra), n in pareja_counter.most_common(5):
+        top_parejas.append({"sale": sale, "entra": entra, "n": n})
+
+    # Top 5 jugadores sustituidos (quién sale más)
+    sale_counter = Counter(r["sale"] for r in rows)
+    top_sustituidos = [
+        {"sale": nombre, "n": n} for nombre, n in sale_counter.most_common(5)
+    ]
+
+    # --- Top minutos desde el banquillo (desde actas) ---
+    sql_banquillo = """
+        SELECT
+            a.jugador,
+            SUM(a.minutos) AS minutos_desde_banquillo
+        FROM actas a
+        LEFT JOIN jornadas j
+            ON a.acta_id = j.acta_id
+        LEFT JOIN competiciones cl
+            ON j.id_equipo_local = cl.id_equipo
+        LEFT JOIN competiciones cv
+            ON j.id_equipo_visitante = cv.id_equipo
+        WHERE a.titular = 0
+    """
+    params_b = {}
+
+    if equipo:
+        sql_banquillo += " AND a.equipo = :equipo"
+        params_b["equipo"] = equipo
+
+    if jornada is not None:
+        sql_banquillo += " AND j.jornada = :jornada"
+        params_b["jornada"] = jornada
+
+    if lv in ("L", "V"):
+        sql_banquillo += """
+            AND CASE
+                    WHEN a.equipo = cl.nombre_equipo THEN 'L'
+                    WHEN a.equipo = cv.nombre_equipo THEN 'V'
+                END = :lv
+        """
+        params_b["lv"] = lv
+
+    sql_banquillo += """
+        GROUP BY a.jugador
+        ORDER BY minutos_desde_banquillo DESC
+        LIMIT 5
+    """
+
+    top_banquillo_rows = db.session.execute(text(sql_banquillo), params_b).mappings().all()
+    top_banquillo = [
+        {"jugador": r["jugador"], "minutos": r["minutos_desde_banquillo"]}
+        for r in top_banquillo_rows
+    ]
+
+    context = {
+        "equipos": equipos,
+        "jornadas": jornadas,
+        "equipo_seleccionado": equipo,
+        "jornada_seleccionada": jornada,
+        "lv_seleccionado": lv,
+        "minuto_medio": minuto_medio,
+        "minuto_medio_primera": minuto_medio_primera,
+        "minuto_medio_ultima": minuto_medio_ultima,
+        "num_medio_sustituciones": num_medio_sustituciones,
+        "distribucion_minuto": distribucion_minuto,
+        "cambios_por_jornada": cambios_por_jornada,
+        "top_parejas": top_parejas,
+        "top_sustituidos": top_sustituidos,
+        "top_banquillo": top_banquillo,
+    }
+
+    return render_template("dashboard/sustituciones.html", **context)
