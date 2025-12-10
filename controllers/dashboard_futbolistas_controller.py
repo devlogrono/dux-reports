@@ -12,12 +12,7 @@ def index():
     seleccionadas_competicion = request.args.getlist('competicion')
 
     # --- Consulta de futbolistas ---
-    sql_futbolistas = """
-        SELECT f.id, f.nombre, f.apellido, f.competicion,
-            dc.nombre_competicion AS competicion_nombre
-        FROM futbolistas f
-        LEFT JOIN diccionario_competiciones dc ON dc.id = f.competicion
-    """
+    sql_futbolistas = "SELECT id, nombre, apellido, competicion FROM futbolistas"
     filtros_f = []
     params_f = {}
 
@@ -39,22 +34,13 @@ def index():
             'nombre': r['nombre'],
             'apellido': r['apellido'],
             'competicion': r['competicion'],
-            'competicion_nombre': r['competicion_nombre'],
             'nombre_completo': f"{r['apellido']}, {r['nombre']}"
         })
 
     # --- Obtener todas las competiciones para el filtro ---
-    sql_competiciones = """
-        SELECT DISTINCT dc.id, dc.nombre_competicion
-        FROM futbolistas f
-        JOIN diccionario_competiciones dc ON dc.id = f.competicion
-        ORDER BY dc.nombre_competicion
-    """
-    competiciones = [
-        {'id': r['id'], 'nombre': r['nombre_competicion']}
-        for r in db.session.execute(text(sql_competiciones)).mappings()
-    ]
-
+    sql_competiciones = "SELECT DISTINCT competicion FROM futbolistas"
+    result_competiciones = db.session.execute(text(sql_competiciones))
+    competiciones = [r[0] for r in result_competiciones]
 
     # --- Consulta de partidos ---
     sql_partidos = """
@@ -102,12 +88,7 @@ def caracteristicas():
     seleccionadas_competicion = request.args.getlist('competicion')
 
     # --- Consulta base de futbolistas para llenar filtros (mismo approach que index) ---
-    sql_futbolistas = """
-        SELECT f.id, f.nombre, f.apellido, f.competicion,
-            dc.nombre_competicion AS competicion_nombre
-        FROM futbolistas f
-        LEFT JOIN diccionario_competiciones dc ON dc.id = f.competicion
-    """
+    sql_futbolistas = "SELECT id, nombre, apellido, competicion FROM futbolistas"
     filtros_f = []
     params_f = {}
 
@@ -129,39 +110,30 @@ def caracteristicas():
             'nombre': r['nombre'],
             'apellido': r['apellido'],
             'competicion': r['competicion'],
-            'competicion_nombre': r['competicion_nombre'],
             'nombre_completo': f"{r['apellido']}, {r['nombre']}"
         })
 
     # --- Obtener todas las competiciones para el filtro ---
-    sql_competiciones = """
-        SELECT DISTINCT dc.id, dc.nombre_competicion
-        FROM futbolistas f
-        JOIN diccionario_competiciones dc ON dc.id = f.competicion
-        ORDER BY dc.nombre_competicion
-    """
-    competiciones = [
-        {'id': r['id'], 'nombre': r['nombre_competicion']}
-        for r in db.session.execute(text(sql_competiciones)).mappings()
-    ]
+    sql_competiciones = "SELECT DISTINCT competicion FROM futbolistas"
+    result_comp = db.session.execute(text(sql_competiciones))
+    competiciones = [r[0] for r in result_comp]
 
     # --- Distribución de futbolistas por competición (con filtros aplicados) ---
     sql_dist = """
-        SELECT dc.nombre_competicion AS competicion, COUNT(*) AS cantidad
-        FROM futbolistas f
-        LEFT JOIN diccionario_competiciones dc ON dc.id = f.competicion
+        SELECT competicion, COUNT(*) AS cantidad
+        FROM futbolistas
     """
     filtros_d = []
     params_d = {}
     if seleccionadas:
-        filtros_d.append("CONCAT(f.apellido, ', ', f.nombre) IN :nombres")
+        filtros_d.append("CONCAT(apellido, ', ', nombre) IN :nombres")
         params_d['nombres'] = tuple(seleccionadas)
     if seleccionadas_competicion:
-        filtros_d.append("f.competicion IN :competicion")
+        filtros_d.append("competicion IN :competicion")
         params_d['competicion'] = tuple(seleccionadas_competicion)
     if filtros_d:
         sql_dist += " WHERE " + " AND ".join(filtros_d)
-    sql_dist += " GROUP BY dc.nombre_competicion ORDER BY cantidad DESC"
+    sql_dist += " GROUP BY competicion ORDER BY cantidad DESC"
 
     result_dist = db.session.execute(text(sql_dist), params_d).mappings()
     dist_comp = [{'competicion': r['competicion'], 'cantidad': r['cantidad']} for r in result_dist]
@@ -170,35 +142,27 @@ def caracteristicas():
     # Columnas reales: fecha_nacimiento (DATE), reconocimiento_medico (DATE)
     sql_chars = """
         SELECT
-            dc.nombre_competicion AS competicion,
-            AVG(TIMESTAMPDIFF(MONTH, f.fecha_nacimiento, CURDATE())) AS edad_promedio_meses,
-            COUNT(f.reconocimiento_medico) AS con_reconocimiento
-        FROM futbolistas f
-        LEFT JOIN diccionario_competiciones dc ON dc.id = f.competicion
+            competicion,
+            AVG(TIMESTAMPDIFF(MONTH, fecha_nacimiento, CURDATE())) AS edad_promedio_meses,
+            COUNT(reconocimiento_medico) AS con_reconocimiento
+        FROM futbolistas
     """
     filtros_ch = []
     params_ch = {}
     if seleccionadas:
-        filtros_ch.append("CONCAT(f.apellido, ', ', f.nombre) IN :nombres")
+        filtros_ch.append("CONCAT(apellido, ', ', nombre) IN :nombres")
         params_ch['nombres'] = tuple(seleccionadas)
     if seleccionadas_competicion:
-        filtros_ch.append("f.competicion IN :competicion")
+        filtros_ch.append("competicion IN :competicion")
         params_ch['competicion'] = tuple(seleccionadas_competicion)
     if filtros_ch:
         sql_chars += " WHERE " + " AND ".join(filtros_ch)
 
-    sql_chars += " GROUP BY dc.nombre_competicion ORDER BY con_reconocimiento DESC"
+    sql_chars += " GROUP BY competicion ORDER BY con_reconocimiento DESC"
 
-    rows_chars = list(db.session.execute(text(sql_chars), params_ch).mappings())  # <-- listar
-    edad_prom = [
-        {'competicion': r['competicion'], 'edad_promedio_meses': r['edad_promedio_meses']}
-        for r in rows_chars
-    ]
-    rec_med = [
-        {'competicion': r['competicion'], 'con_reconocimiento': r['con_reconocimiento']}
-        for r in rows_chars
-    ]
-
+    rows_chars = db.session.execute(text(sql_chars), params_ch).mappings()
+    edad_prom = [{'competicion': r['competicion'], 'edad_promedio_meses': r['edad_promedio_meses']} for r in rows_chars]
+    rec_med = [{'competicion': r['competicion'], 'con_reconocimiento': r['con_reconocimiento']} for r in rows_chars]
 
     # --- Detalle por futbolista (para gráficos por jugador): edad (en meses) y reconocimiento_medico ---
     sql_players = """
@@ -261,12 +225,7 @@ def estadisticas():
     seleccionadas_competicion = request.args.getlist('competicion')
 
     # --- Consulta base de futbolistas para filtros ---
-    sql_futbolistas = """
-        SELECT f.id, f.nombre, f.apellido, f.competicion,
-            dc.nombre_competicion AS competicion_nombre
-        FROM futbolistas f
-        LEFT JOIN diccionario_competiciones dc ON dc.id = f.competicion
-    """
+    sql_futbolistas = "SELECT id, nombre, apellido, competicion FROM futbolistas"
     filtros_f = []
     params_f = {}
     if seleccionadas:
@@ -286,31 +245,23 @@ def estadisticas():
             'nombre': r['nombre'],
             'apellido': r['apellido'],
             'competicion': r['competicion'],
-            'competicion_nombre': r['competicion_nombre'],
             'nombre_completo': f"{r['apellido']}, {r['nombre']}"
         })
 
     # --- Opciones de competiciones ---
-    sql_competiciones = """
-        SELECT DISTINCT dc.id, dc.nombre_competicion
-        FROM futbolistas f
-        JOIN diccionario_competiciones dc ON dc.id = f.competicion
-        ORDER BY dc.nombre_competicion
-    """
-    competiciones = [
-        {'id': r['id'], 'nombre': r['nombre_competicion']}
-        for r in db.session.execute(text(sql_competiciones)).mappings()
-    ]
+    sql_competiciones = "SELECT DISTINCT competicion FROM futbolistas"
+    result_comp = db.session.execute(text(sql_competiciones))
+    competiciones = [r[0] for r in result_comp]
 
     # --- Agregados por usuario desde actas ---
     sql_stats = """
         SELECT
             CONCAT(f.apellido, ', ', f.nombre) AS nombre_completo,
             COALESCE(SUM(`Goles`), 0)              AS goles,
-            COALESCE(SUM(`Goles de penalty`), 0)   AS goles_penalty,
+            COALESCE(SUM(a.goles_penalty), 0)      AS goles_penalty,
             COALESCE(SUM(`Minutos`), 0)            AS minutos,
-            COALESCE(SUM(`Tarjetas Amarillas`), 0) AS amarillas,
-            COALESCE(SUM(`Tarjetas rojas`), 0)     AS rojas
+            COALESCE(SUM(a.tarjetas_amarillas), 0) AS amarillas,
+            COALESCE(SUM(a.tarjetas_rojas), 0)     AS rojas
         FROM futbolistas f
         LEFT JOIN actas a ON CONCAT(f.apellido, ', ', f.nombre) = a.jugador
     """
@@ -345,4 +296,91 @@ def estadisticas():
         seleccionadas=seleccionadas,
         seleccionadas_competicion=seleccionadas_competicion,
         per_jugador=per_jugador,
+    )
+
+
+@bp.get("/analisis-equipo")
+@login_required
+def analisis_equipo():
+    """Dashboard de análisis del equipo con único filtro de competición."""
+    seleccionadas_competicion = request.args.getlist('plantel') or request.args.getlist('competicion')
+
+    # Opciones de competiciones para el filtro
+    sql_competiciones = "SELECT DISTINCT competicion FROM futbolistas"
+    result_comp = db.session.execute(text(sql_competiciones))
+    competiciones = [r[0] for r in result_comp]
+
+    # Series por jugador (desde actas)
+    sql_stats = """
+        SELECT
+            CONCAT(f.apellido, ', ', f.nombre) AS nombre_completo,
+            COALESCE(SUM(`Goles`), 0)              AS goles,
+            COALESCE(SUM(`Minutos`), 0)            AS minutos,
+            COALESCE(SUM(a.tarjetas_amarillas), 0) AS amarillas,
+            COALESCE(SUM(a.tarjetas_rojas), 0)     AS rojas
+        FROM futbolistas f
+        LEFT JOIN actas a ON CONCAT(f.apellido, ', ', f.nombre) = a.jugador
+    """
+    filtros_s, params_s = [], {}
+    if seleccionadas_competicion:
+        filtros_s.append("f.competicion IN :competicion")
+        params_s['competicion'] = tuple(seleccionadas_competicion)
+    if filtros_s:
+        sql_stats += " WHERE " + " AND ".join(filtros_s)
+    sql_stats += " GROUP BY nombre_completo"
+
+    rows = db.session.execute(text(sql_stats), params_s).mappings()
+    per_jugador = []
+    totals = { 'goles': 0, 'amarillas': 0, 'rojas': 0, 'minutos': 0 }
+    for r in rows:
+        item = {
+            'nombre_completo': r['nombre_completo'],
+            'goles': int(r['goles'] or 0),
+            'minutos': int(r['minutos'] or 0),
+            'amarillas': int(r['amarillas'] or 0),
+            'rojas': int(r['rojas'] or 0),
+        }
+        per_jugador.append(item)
+        totals['goles'] += item['goles']
+        totals['amarillas'] += item['amarillas']
+        totals['rojas'] += item['rojas']
+        totals['minutos'] += item['minutos']
+
+    # Partidos jugados (aprox) por el equipo: máximo conteo individual
+    sql_part = """
+        SELECT CONCAT(f.apellido, ', ', f.nombre) AS nombre_completo, COUNT(a.jugador) AS partidos
+        FROM futbolistas f
+        LEFT JOIN actas a ON CONCAT(f.apellido, ', ', f.nombre) = a.jugador
+    """
+    filtros_p, params_p = [], {}
+    if seleccionadas_competicion:
+        filtros_p.append("f.competicion IN :competicion")
+        params_p['competicion'] = tuple(seleccionadas_competicion)
+    if filtros_p:
+        sql_part += " WHERE " + " AND ".join(filtros_p)
+    sql_part += " GROUP BY nombre_completo"
+    res_part = db.session.execute(text(sql_part), params_p).mappings()
+    partidos_jugados = 0
+    for r in res_part:
+        partidos_jugados = max(partidos_jugados, int(r['partidos'] or 0))
+
+    kpis = {
+        'goles_favor': totals['goles'],
+        'tarjetas_amarillas': totals['amarillas'],
+        'tarjetas_rojas': totals['rojas'],
+        'num_jugadores': len(per_jugador),
+        'partidos_jugados': partidos_jugados,
+    }
+
+    print("DEBUG seleccionadas_competicion:", seleccionadas_competicion, flush=True)
+    print("DEBUG per_jugador len:", len(per_jugador), flush=True)
+    if per_jugador:
+        print("DEBUG per_jugador sample:", per_jugador[:5], flush=True)
+
+    return render_template(
+        "dashboard/analisis_equipo.html",
+        competiciones=competiciones,
+        seleccionadas_competicion=seleccionadas_competicion,
+        per_jugador=per_jugador,
+        kpis=kpis,
     )

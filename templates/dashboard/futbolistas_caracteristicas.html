@@ -20,6 +20,10 @@
             <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.estadisticas' %}active{% endif %}"
                href="{{ url_for('dashboard_futbolistas.estadisticas') }}{{ qstr }}">Estadísticas</a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.analisis_equipo' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.analisis_equipo') }}{{ qstr }}">Análisis equipo</a>
+        </li>
     </ul>
 
     <!-- Filtros centrados y con ancho contenido -->
@@ -44,12 +48,12 @@
                     <div class="col-md-5">
                         <label for="competicion">Seleccionar Competición</label>
                         <select name="competicion" id="competicion" multiple class="form-select">
-                          {% for c in competiciones %}
-                            <option value="{{ c.id }}"
-                              {% if c.id in seleccionadas_competicion %} selected {% endif %}>
-                              {{ c.nombre }}
-                            </option>
-                          {% endfor %}
+                            {% for c in competiciones %}
+                                <option value="{{ c }}"
+                                    {% if c in seleccionadas_competicion %} selected {% endif %}>
+                                    {{ c }}
+                                </option>
+                            {% endfor %}
                         </select>
                     </div>
 

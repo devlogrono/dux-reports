@@ -1,0 +1,245 @@
+{% extends "layouts/base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <h1>Análisis equipo</h1>
+
+  {# Tabs con preservación de filtros (solo competicion aquí) #}
+  {% set qstr = seleccionadas_competicion|length and ('?' + (seleccionadas_competicion|map('string')|list|map('urlencode')|list|join('&competicion=')|safe)|replace('%2C', ',')|string) or '' %}
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+      <a class="nav-link" href="{{ url_for('dashboard_futbolistas.index') }}">Participaciones</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="{{ url_for('dashboard_futbolistas.caracteristicas') }}">Características</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" href="{{ url_for('dashboard_futbolistas.estadisticas') }}">Estadísticas</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link active" href="{{ url_for('dashboard_futbolistas.analisis_equipo') }}{{ qstr }}">Análisis equipo</a>
+    </li>
+  </ul>
+
+  <!-- Único filtro: Plantel (visible, centrado, 1 renglón) -->
+  <div class="d-flex justify-content-center mb-3">
+    <form method="get" class="w-100" style="max-width: 720px;">
+      <div class="row g-3 align-items-end">
+        <div class="col-12 col-md-8">
+          <label for="plantel">Seleccionar Plantel</label>
+          <select multiple class="form-select" id="plantel" name="plantel">
+            {% for c in competiciones %}
+            <option value="{{ c }}" {% if c in seleccionadas_competicion %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-4 d-flex gap-2">
+          <button type="submit" class="btn btn-primary">Aplicar</button>
+          <button type="button" class="btn btn-secondary" id="btnLimpiarComp">Limpiar</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="row g-4">
+    <!-- KPIs izquierda -->
+    <div class="col-12 col-xl-3">
+      <div class="d-grid gap-3">
+        <div class="rounded shadow-sm p-3 bg-white">
+          <div class="small text-muted">Goles a favor</div>
+          <div class="display-6">{{ kpis.goles_favor or 0 }}</div>
+        </div>
+        <div class="rounded shadow-sm p-3 bg-white">
+          <div class="small text-muted">Tarjetas amarillas</div>
+          <div class="display-6">{{ kpis.tarjetas_amarillas or 0 }}</div>
+        </div>
+        <div class="rounded shadow-sm p-3 bg-white">
+          <div class="small text-muted">Tarjetas rojas</div>
+          <div class="display-6">{{ kpis.tarjetas_rojas or 0 }}</div>
+        </div>
+        <div class="rounded shadow-sm p-3 bg-white">
+          <div class="small text-muted">Nº jugadores</div>
+          <div class="display-6">{{ kpis.num_jugadores or 0 }}</div>
+        </div>
+        <div class="rounded shadow-sm p-3 bg-white">
+          <div class="small text-muted">Partidos jugados</div>
+          <div class="display-6">{{ kpis.partidos_jugados or 0 }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Centro: Minutos por jugador (barras, verde->rojo) -->
+    <div class="col-12 col-xl-6">
+      <div class="rounded shadow-sm p-3 bg-white">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h5 class="mb-0">Minutos por jugador</h5>
+          <button id="png-min" type="button" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download"></i> PNG</button>
+        </div>
+        <div style="height:60vh">
+          <canvas id="chart-min"
+            data-labels='{{ per_jugador | map(attribute="nombre_completo") | list | tojson }}'
+            data-minutos='{{ per_jugador | map(attribute="minutos") | list | tojson }}'></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Derecha: superior pie goles, inferior tarjetas apiladas -->
+    <div class="col-12 col-xl-3">
+      <div class="rounded shadow-sm p-3 bg-white mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">Goles por jugador</h6>
+          <button id="png-goles" type="button" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download"></i></button>
+        </div>
+        <div style="height:28vh"><canvas id="chart-goles"
+          data-labels='{{ per_jugador | map(attribute="nombre_completo") | list | tojson }}'
+          data-goles='{{ per_jugador | map(attribute="goles") | list | tojson }}'></canvas></div>
+      </div>
+      <div class="rounded shadow-sm p-3 bg-white">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">Tarjetas por jugador</h6>
+          <button id="png-tar" type="button" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download"></i></button>
+        </div>
+        <div style="height:28vh"><canvas id="chart-tar"
+          data-labels='{{ per_jugador | map(attribute="nombre_completo") | list | tojson }}'
+          data-amarillas='{{ per_jugador | map(attribute="amarillas") | list | tojson }}'
+          data-rojas='{{ per_jugador | map(attribute="rojas") | list | tojson }}'></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+<script>
+console.log('[AE] scripts init');
+function toGradient(ctx, area, min, max, values){
+  const g = ctx.createLinearGradient(0, area.bottom, 0, area.top);
+  // colors from red (low) to green (high)
+  g.addColorStop(0, '#e11d48');
+  g.addColorStop(0.5, '#f59e0b');
+  g.addColorStop(1, '#16a34a');
+  // We'll return a color per value using a mapping function
+  const lo = Math.min.apply(null, values.concat([min]));
+  const hi = Math.max.apply(null, values.concat([max]));
+  const scale = (v)=> (hi===lo? 1 : (v-lo)/(hi-lo));
+  return values.map(v=>{
+    const t = scale(v);
+    // sample gradient: approximate with simple lerp between red->green via yellow
+    const r = Math.round(225 + (22-225)*t);
+    const gC = Math.round(29 + (163-29)*t);
+    const b = Math.round(72 + (74-72)*t);
+    return `rgba(${r},${gC},${b},0.85)`;
+  });
+}
+function dl(canvasId){
+  const c = document.getElementById(canvasId);
+  const chart = c._chart;
+  const a = document.createElement('a');
+  a.href = chart.toBase64Image('image/png',1.0);
+  a.download = canvasId + '.png'; a.click();
+}
+
+// Registrar plugins
+try { if (window.ChartDataLabels) { Chart.register(ChartDataLabels); console.log('[AE] ChartDataLabels registered'); } } catch(e) { console.warn('[AE] datalabels not registered', e); }
+
+// Utilidades de ordenamiento
+function sortBy(values, labels, ...series){
+  const idx = values.map((v,i)=>({i,v})).sort((a,b)=> b.v - a.v).map(o=> o.i);
+  const sortArr = (arr)=> idx.map(i=> arr[i]);
+  return {
+    labels: sortArr(labels),
+    series: series.map(sortArr)
+  };
+}
+
+// Minutos (barras con color por valor)
+(function(){
+  const el = document.getElementById('chart-min');
+  const labels = JSON.parse(el.dataset.labels||'[]');
+  const m = JSON.parse(el.dataset.minutos||'[]').map(v=> Number(v)||0);
+  const ctx = el.getContext('2d');
+  try {
+    console.log('[AE][Minutos] labels', labels.length, labels.slice(0,5));
+    console.log('[AE][Minutos] data', m.length, m.slice(0,5));
+    // ordenar de mayor a menor
+    const sorted = sortBy(m, labels, m);
+    const sLabels = sorted.labels;
+    const sM = sorted.series[0];
+    const chart = new Chart(ctx, { type:'bar', data:{ labels: sLabels, datasets:[{ label:'Minutos', data:sM, backgroundColor:'#16a34a', borderColor:'#0f7a34' }] }, options:{ responsive:true, maintainAspectRatio:false, indexAxis:'y', plugins:{ legend:{display:false}, datalabels:{ anchor:'end', align:'end', color:'#111', formatter:(v)=> v } }, scales:{ x:{ beginAtZero:true } } } });
+    // Apply per-bar color scale
+    const applyColors = ()=>{ const colors = toGradient(ctx, chart.chartArea, 0, 0, sM); chart.data.datasets[0].backgroundColor = colors; chart.update(); };
+    el._chart = chart; // for download
+    document.getElementById('png-min').addEventListener('click', ()=> dl('chart-min'));
+    // wait first render to know chartArea
+    setTimeout(applyColors, 50);
+    console.log('[AE][Minutos][init ok]');
+  } catch(err) {
+    console.error('[AE][Minutos][error]', err);
+  }
+})();
+
+// Goles (pie)
+(function(){
+  const el = document.getElementById('chart-goles');
+  const labels = JSON.parse(el.dataset.labels||'[]');
+  const g = JSON.parse(el.dataset.goles||'[]').map(v=> Number(v)||0);
+  const ctx = el.getContext('2d');
+  const colors = labels.map((_,i)=> `hsl(${(i*47)%360} 80% 55%)`);
+  try {
+    console.log('[AE][Goles Pie] labels', labels.length, labels.slice(0,5));
+    console.log('[AE][Goles Pie] data', g.length, g.slice(0,5));
+    // Filtrar jugadores con 0 goles
+    const filtered = [];
+    for (let i=0;i<g.length;i++){ if (g[i] > 0) filtered.push(i); }
+    const fLabels = filtered.map(i=> labels[i]);
+    const fG = filtered.map(i=> g[i]);
+    const fColors = filtered.map(i=> colors[i]);
+    const chart = new Chart(ctx, { type:'pie', data:{ labels: fLabels, datasets:[{ data:fG, backgroundColor:fColors, radius:'48%' }] }, options:{ responsive:true, maintainAspectRatio:false, aspectRatio:1, layout:{ padding:{ top:12, right:16, bottom:12, left:16 } }, plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label: (ctx)=>{ const full = ctx.chart.data.labels[ctx.dataIndex] || ''; const v = ctx.parsed || 0; return `${full} (${v})`; } } }, datalabels:{ color:'#333', formatter: (value, ctx)=>{ // mostrar solo apellido y solo si value>=2
+          const full = ctx.chart.data.labels[ctx.dataIndex] || '';
+          if (!value || value < 2) return '';
+          const surname = full.split(',')[0]?.trim() || full; // 'APELLIDO, Nombre'
+          return `${surname} (${value})`;
+        }, anchor:'end', align:'end', offset:12, clamp:true } } } });
+    el._chart = chart; document.getElementById('png-goles').addEventListener('click', ()=> dl('chart-goles'));
+    console.log('[AE][Goles Pie][init ok]');
+  } catch(err) {
+    console.error('[AE][Goles Pie][error]', err);
+  }
+})();
+
+// Tarjetas (apilado)
+(function(){
+  const el = document.getElementById('chart-tar');
+  const labels = JSON.parse(el.dataset.labels||'[]');
+  const a = JSON.parse(el.dataset.amarillas||'[]').map(v=> Number(v)||0);
+  const r = JSON.parse(el.dataset.rojas||'[]').map(v=> Number(v)||0);
+  const ctx = el.getContext('2d');
+  try {
+    console.log('[AE][Tarjetas] labels', labels.length, labels.slice(0,5));
+    console.log('[AE][Tarjetas] amarillas', a.length, a.slice(0,5));
+    console.log('[AE][Tarjetas] rojas', r.length, r.slice(0,5));
+    // ordenar por total desc
+    const totals = a.map((v,i)=> v + (r[i]||0));
+    const sorted = sortBy(totals, labels, a, r);
+    const sLabels = sorted.labels;
+    const sA = sorted.series[0];
+    const sR = sorted.series[1];
+    const chart = new Chart(ctx, { type:'bar', data:{ labels: sLabels, datasets:[
+      { label:'Amarillas', data:sA, backgroundColor:'rgba(255,193,7,0.85)', borderColor:'#ffc107' },
+      { label:'Rojas', data:sR, backgroundColor:'rgba(220,53,69,0.85)', borderColor:'#dc3545' }
+    ] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false }, datalabels:{ display:false } }, scales:{ x:{ stacked:true }, y:{ beginAtZero:true, stacked:true } } } });
+    el._chart = chart; document.getElementById('png-tar').addEventListener('click', ()=> dl('chart-tar'));
+    console.log('[AE][Tarjetas][init ok]');
+  } catch(err) {
+    console.error('[AE][Tarjetas][error]', err);
+  }
+})();
+
+// limpiar competicion
+document.getElementById('btnLimpiarComp')?.addEventListener('click', ()=>{
+  const sel = document.getElementById('plantel');
+  if (sel) sel.selectedIndex = -1;
+  sel?.form?.submit();
+});
+</script>
+{% endblock %}
