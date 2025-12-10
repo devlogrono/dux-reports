@@ -78,6 +78,14 @@ def delete(row_id):
         return "Modelo state_user no disponible", 500
     row = db.session.get(M, row_id)
     if row:
+        # Comprobar si el estado está en uso por algún futbolista
+        F = getattr(Base.classes, "futbolistas", None)
+        if F is not None and hasattr(F, "id_estado"):
+            usados = db.session.query(F).filter(F.id_estado == row.id).count()
+            if usados > 0:
+                flash(f"No se puede eliminar: el estado está asignado a {usados} futbolista(s)", "danger")
+                return redirect(url_for("state_user.state_users_list"))
+
         db.session.delete(row)
         db.session.commit()
         flash("Estado eliminado", "info")

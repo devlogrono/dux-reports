@@ -40,6 +40,11 @@
       <thead>
         <tr>
           <th class="d-none">ID</th>
+          {% if can('update_jugador') %}
+          <th class="text-center" title="Un check verde indica que los datos del futbolista han sido aprobados por un administrador">
+            <i class="bi bi-info-circle"></i>
+          </th>
+          {% endif %}
           {% if mostrar_dorsal %}
           <th>Dorsal</th>
           {% endif %}
@@ -62,6 +67,19 @@
         {% for r in rows %}
         <tr>
           <td class="text-truncate d-none" style="max-width:150px">{{ r.id }}</td>
+          {% if can('update_jugador') %}
+          <td class="text-center">
+            <form method="post" action="{{ url_for('jugadores.toggle_verificado', row_id=r.id) }}" class="d-inline">
+              <button type="submit" class="btn btn-sm btn-link p-0" title="Un check verde indica que los datos del futbolista han sido aprobados por un administrador">
+                {% if r.verificado %}
+                  <i class="bi bi-check-square-fill text-success"></i>
+                {% else %}
+                  <i class="bi bi-square text-secondary"></i>
+                {% endif %}
+              </button>
+            </form>
+          </td>
+          {% endif %}
           {% if mostrar_dorsal %}
           <td>{{ r.dorsal or '' }}</td>
           {% endif %}

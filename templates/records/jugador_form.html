@@ -11,11 +11,7 @@
         <div class="input-group">
           <span class="input-group-text"><i class="bi bi-person"></i></span>
           <input type="text" class="form-control" id="nombre" name="nombre"
-                value="{{ row.nombre if row }}"
-                {% if editing %}disabled{% else %}required{% endif %} />
-          {% if editing %}
-            <input type="hidden" name="nombre" value="{{ row.nombre if row }}">
-          {% endif %}
+                value="{{ row.nombre if row }}" required />
           <div class="invalid-feedback">El nombre es obligatorio.</div>
         </div>
       </div>
@@ -25,47 +21,36 @@
         <div class="input-group">
           <span class="input-group-text"><i class="bi bi-person"></i></span>
           <input type="text" class="form-control" id="apellido" name="apellido"
-                value="{{ row.apellido if row }}"
-                {% if editing %}disabled{% else %}required{% endif %} />
-          {% if editing %}
-            <input type="hidden" name="apellido" value="{{ row.apellido if row }}">
-          {% endif %}
+                value="{{ row.apellido if row }}" required />
           <div class="invalid-feedback">El apellido es obligatorio.</div>
         </div>
       </div>
 
       <div class="col-md-4">
         <label for="genero" class="form-label">Género</label>
-        <select id="genero" name="genero" class="form-select" {{ 'disabled' if editing }}>
+        <select id="genero" name="genero" class="form-select">
           <option value="" {% if not row or not row.genero %}selected{% endif %}>- Seleccionar -</option>
           <option value="M" {% if row and row.genero=='M' %}selected{% endif %}>Masculino</option>
           <option value="F" {% if row and row.genero=='F' %}selected{% endif %}>Femenino</option>
-          <option value="Otro" {% if row and row.genero=='Otro' %}selected{% endif %}>Otro</option>
         </select>
       </div>
 
       {# Edad (en edición) o Fecha de nacimiento (en nuevo) #}
       <div class="col-md-4">
-        {% if editing %}
-          <label class="form-label">Edad</label>
-          <input type="text" class="form-control" value="{{ edad or '' }}" disabled />
-        {% else %}
-          <label for="fecha_nacimiento" class="form-label">Fecha de nacimiento</label>
-          <input type="date" class="form-control" id="fecha_nacimiento" name="fecha_nacimiento"
-                 value="{{ row.fecha_nacimiento.strftime('%Y-%m-%d') if row and row.fecha_nacimiento }}" />
-        {% endif %}
+        <label for="fecha_nacimiento" class="form-label">Fecha de nacimiento</label>
+        <input type="date" class="form-control" id="fecha_nacimiento" name="fecha_nacimiento"
+               value="{{ row.fecha_nacimiento.strftime('%Y-%m-%d') if row and row.fecha_nacimiento }}" />
       </div>
 
       <div class="col-md-4">
         <label for="reconocimiento_medico" class="form-label">Reconocimiento médico</label>
         <input type="date" class="form-control" id="reconocimiento_medico" name="reconocimiento_medico"
-               value="{{ row.reconocimiento_medico.strftime('%Y-%m-%d') if row and row.reconocimiento_medico }}"
-               {{ 'readonly' if editing }} {{ 'disabled' if editing }} />
+               value="{{ row.reconocimiento_medico.strftime('%Y-%m-%d') if row and row.reconocimiento_medico }}" />
       </div>
 
       <div class="col-md-6">
         <label for="id_estado" class="form-label">Estado</label>
-        <select id="id_estado" name="id_estado" class="form-select" {{ 'disabled' if editing }}>
+        <select id="id_estado" name="id_estado" class="form-select">
           <option value="">- Seleccionar -</option>
           {% for eid, ename in estados %}
             <option value="{{ eid }}" {% if row and row.id_estado==eid %}selected{% endif %}>{{ ename }}</option>
@@ -76,7 +61,7 @@
       {% if row is not none and row.__class__.__dict__.get('competicion') or competiciones %}
       <div class="col-md-6">
         <label for="competicion" class="form-label">Equipo</label>
-        <select id="competicion" name="competicion" class="form-select" {{ 'disabled' if editing }}>
+        <select id="competicion" name="competicion" class="form-select">
           <option value="">- Seleccionar -</option>
           {% for c in competiciones %}
             <option value="{{ c.id }}" {% if row and row.competicion==c.id %}selected{% endif %}>{{ c.nombre }}</option>

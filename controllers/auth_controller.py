@@ -196,7 +196,9 @@ def login_post():
         flash("Modelo de usuario no disponible", "danger")
         return redirect(url_for("auth.login_get"))
 
-    user = db.session.query(User).filter_by(email=form.email.data).first()
+    # Normalizar email igual que al guardar usuarios (lower + strip)
+    email_input = (form.email.data or "").strip().lower()
+    user = db.session.query(User).filter(User.email == email_input).first()
 
     ok = False
     if user and user.password_hash:

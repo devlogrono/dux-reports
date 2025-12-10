@@ -41,12 +41,14 @@ def _get_choices(model):
 def users_list():
     User = _model("users")
     Role = _model("roles")
+    Status = _model("estatus_registro")
     if not User:
         return "Modelo users no disponible", 500
 
     q = request.args.get("q", "").strip()
     role_filter = request.args.get("role")
-    state_filter = request.args.get("state", "2")
+    # Por defecto no filtrar por estado
+    state_filter = request.args.get("state", "").strip()
 
     query = db.session.query(User)
     if q:
@@ -74,6 +76,17 @@ def users_list():
     pages = math.ceil(total / per_page)
     roles_full = _get_choices(Role)
     roles_lookup = {r.id: r.name for r in roles_full}
+
+    # Diccionario de estados desde estatus_registro
+    statuses = []
+    status_lookup = {}
+    if Status:
+        rows = db.session.query(Status.id, getattr(Status, "nombre", None)).order_by(getattr(Status, "nombre", None).asc()).all()
+        for r in rows:
+            # r[1] es el nombre/descripcion del estado
+            label = r[1]
+            statuses.append({"id": r[0], "nombre": label})
+        status_lookup = {s["id"]: s["nombre"] for s in statuses}
     return render_template(
         "list/users.html",
         users=users,
@@ -84,6 +97,8 @@ def users_list():
         roles_lookup=roles_lookup,
         role_filter=role_filter,
         state_filter=state_filter,
+        statuses=statuses,
+        status_lookup=status_lookup,
     )
 
 
@@ -107,25 +122,19 @@ def user_edit(user_id):
 def _user_form(user_id=None):
     User = _model("users")
     Role = _model("roles")
-    State = _model("state_user")
+    Status = _model("estatus_registro")
     if not User:
         return "Modelo users no disponible", 500
 
     user = db.session.get(User, user_id) if user_id else None
 
     roles = _get_choices(Role)
-    state_choices = []
-    if State:
-        rows = db.session.query(State.id, State.name).order_by(State.name.asc()).all()
-        state_choices = [(r.id, r.name) for r in rows]
 
     if request.method == "POST":
         email = request.form.get("email", "").strip()
         name = request.form.get("name", "").strip()
         lastname = request.form.get("lastname", "").strip()
-        cellular = request.form.get("cellular", "").strip()
         role_id = request.form.get("role_id")
-        state_id = int(request.form.get("state_id", 2))
         password = request.form.get("password", "").strip()
 
         # Validations
@@ -153,9 +162,14 @@ def _user_form(user_id=None):
         user.email = email.strip().lower()
         user.name = name
         user.lastname = lastname
-        user.cellular = cellular
         user.role_id = int(role_id) if role_id else None
-        user.state_id = state_id
+
+        # Manejar state_id internamente: para nuevos usuarios, por defecto 2; para existentes, mantener
+        if user.id is None:
+            try:
+                user.state_id = 2
+            except Exception:
+                pass
 
         if password:
             user.password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
@@ -168,7 +182,6 @@ def _user_form(user_id=None):
         "records/user_form.html",
         user=user,
         roles=roles,
-        state_choices=state_choices,
     )
 
 

@@ -101,7 +101,7 @@
                             <li><a class="dropdown-item" href="{{ url_for('users.users_list') }}">Usuarios</a></li>
                           {% endif %}
                             {% if can_mod('state_user') %}
-                            <li><a class="dropdown-item" href="{{ url_for('state_user.state_users_list') }}">Estados de usuario</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('state_user.state_users_list') }}">Estados de futbolistas</a></li>
                             {% endif %}
                             {% if can_mod('notifications') %}
                             <li><a class="dropdown-item" href="{{ url_for('notifications.list_all') }}">Notificaciones</a></li>

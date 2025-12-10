@@ -86,6 +86,7 @@ def list():  # type: ignore[override]
             getattr(I, "nacionalidad", None).label("nacionalidad"),
             getattr(I, "posicion", None).label("posicion"),
             getattr(I, "dorsal", None).label("dorsal"),
+            getattr(F, "verificado", None).label("verificado"),
         ]
     )
 
@@ -173,6 +174,7 @@ def list():  # type: ignore[override]
             "competicion": getattr(r, "competicion", None),
             "vencido": vencido,
             "nacionalidad": getattr(r, "nacionalidad", None),
+            "verificado": getattr(r, "verificado", None),
         })
 
     competiciones = []
@@ -269,7 +271,15 @@ def _form(row_id: str | None = None):
 
     estados = []
     if S:
-        estados = db.session.query(S.id, S.name).order_by(S.name.asc()).all()
+        rows = db.session.query(S.id, S.name).order_by(S.name.asc()).all()
+        allowed = []
+        for r in rows:
+            name_norm = (r.name or "").strip().upper()
+            if name_norm == "ACTIVO":
+                allowed.append((r.id, "ACTIVO"))
+            elif name_norm in ("CESION", "CESIÓN"):
+                allowed.append((r.id, "CESIÓN"))
+        estados = allowed
 
     row = db.session.get(F, row_id) if row_id else None
     info_row = None
@@ -443,12 +453,49 @@ def delete(row_id: str):
     row = db.session.get(F, row_id)
     if row:
         # Eliminar información adicional ligada al futbolista
-        if I is not None and hasattr(I, "id_futbolista"):
-            db.session.query(I).filter(I.id_futbolista == row_id).delete(synchronize_session=False)
+        if I is not None:
+            identificacion = getattr(row, "identificacion", None)
+
+            # Si la tabla tiene columna id_futbolista, eliminar por ese campo
+            if hasattr(I, "id_futbolista"):
+                db.session.query(I).filter(I.id_futbolista == row.id).delete(synchronize_session=False)
+
+            # Si la tabla está enlazada por identificacion, eliminar también por ahí
+            if identificacion is not None and hasattr(I, "identificacion"):
+                db.session.query(I).filter(I.identificacion == identificacion).delete(synchronize_session=False)
 
         # Eliminar el propio futbolista
         db.session.delete(row)
         db.session.commit()
         flash("Futbolista eliminado", "info")
 
+    return redirect(url_for("jugadores.list"))
+
+
+@jugadores_bp.post("/<string:row_id>/toggle-verificado")
+@login_required
+@require_perm("update_jugador")
+def toggle_verificado(row_id: str):
+    """Alterna el campo verificado (0/1) de un futbolista.
+
+    Solo accesible para usuarios con permiso de actualización de jugador.
+    """
+    F = _model("futbolistas")
+    if not F:
+        return "Modelo futbolistas no disponible", 500
+
+    row = db.session.get(F, row_id)
+    if not row or not hasattr(row, "verificado"):
+        flash("No se pudo actualizar la verificación del futbolista", "danger")
+        return redirect(url_for("jugadores.list"))
+
+    try:
+        actual = getattr(row, "verificado") or 0
+        nuevo = 0 if int(actual) else 1
+    except Exception:
+        nuevo = 1 if not getattr(row, "verificado", None) else 0
+
+    setattr(row, "verificado", nuevo)
+    db.session.commit()
+    flash("Estado de verificación actualizado", "success")
     return redirect(url_for("jugadores.list"))

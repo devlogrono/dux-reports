@@ -87,7 +87,7 @@
           <form method="get" class="mb-0">
             <div class="mb-0">
               <label for="competicion" class="form-label mb-1">Competición</label>
-              {% set selected_comp = competicion_sel or '3FFF' %}
+              {% set selected_comp = competicion_sel or '1FF' %}
               <select id="competicion" name="competicion" class="form-select" onchange="this.form.submit()">
                 {% if not competiciones %}
                   <option value="">(Sin competiciones)</option>

@@ -66,12 +66,8 @@ def index():
         except Exception as exc:
             print("[dashboard_actas] Error leyendo competiciones via SQL:", exc)
 
-    # Eliminar 1FF del listado si existe
-    if raw_competiciones:
-        raw_competiciones = [c for c in raw_competiciones if c != "1FF"]
-        print("[dashboard_actas] competiciones sin 1FF:", raw_competiciones)
-
-    orden_preferido = ["3FFF", "1J", "1C", "CFF", "1I", "IFF"]
+    # Orden preferido de competiciones (1FF incluida)
+    orden_preferido = ["1FF", "3FFF", "1J", "1C", "CFF", "1I", "IFF"]
     ordered_codes = []
     if raw_competiciones:
         ordered_codes = [c for c in orden_preferido if c in raw_competiciones] + sorted(
@@ -98,7 +94,8 @@ def index():
 
     print("[dashboard_actas] competiciones tras ordenar:", competiciones)
 
-    competicion_sel = request.args.get("competicion") or "3FFF"
+    # Por defecto usar 1FF como competición seleccionada
+    competicion_sel = request.args.get("competicion") or "1FF"
     if competiciones and competicion_sel not in [c["id"] for c in competiciones]:
         competicion_sel = competiciones[0]["id"]
     equipo_sel = request.args.get("equipo") or None
@@ -233,16 +230,17 @@ def index():
                     sql_team, {"comp": competicion_sel, "equipo": equipo_sel}
                 ).fetchall()
             else:
+                # Búsqueda case-insensitive del equipo DUX usando LOWER(nombre_equipo)
                 sql_team = text(
                     "SELECT DISTINCT id_equipo, nombre_equipo "
                     "FROM competiciones "
                     "WHERE competicion = :comp "
-                    "  AND nombre_equipo LIKE :pattern "
+                    "  AND LOWER(nombre_equipo) LIKE :pattern "
                     "ORDER BY nombre_equipo ASC "
                     "LIMIT 1"
                 )
                 rows_team = db.session.execute(
-                    sql_team, {"comp": competicion_sel, "pattern": "%DUX%"}
+                    sql_team, {"comp": competicion_sel, "pattern": "%dux%"}
                 ).fetchall()
 
             if rows_team:

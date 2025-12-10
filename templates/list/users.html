@@ -27,9 +27,9 @@
   <div class="col-auto">
     <select class="form-select" name="state">
       <option value="">Todos los estados</option>
-      <option value="2" {% if state_filter == '2' %}selected{% endif %}>Activo</option>
-      <option value="1" {% if state_filter == '1' %}selected{% endif %}>Inactivo</option>
-      <option value="3" {% if state_filter == '3' %}selected{% endif %}>Suspendido</option>
+      {% for s in statuses %}
+      <option value="{{ s.id }}" {% if state_filter == s.id|string %}selected{% endif %}>{{ s.nombre }}</option>
+      {% endfor %}
     </select>
   </div>
   <div class="col-auto">
@@ -48,7 +48,6 @@
       <th>Nombre</th>
       <th>Apellido</th>
       <th>Rol</th>
-      <th>Estado</th>
       <th>Acciones</th>
     </tr>
   </thead>
@@ -59,9 +58,6 @@
       <td>{{ u.name }}</td>
       <td>{{ u.lastname }}</td>
       <td>{{ roles_lookup.get(u.role_id, '-') }}</td>
-      <td>
-        {% if u.state_id == 2 %}<span class="badge bg-success">Activo</span>{% elif u.state_id == 1 %}<span class="badge bg-secondary">Inactivo</span>{% else %}<span class="badge bg-warning">Suspendido</span>{% endif %}
-      </td>
       <td>
         {% if can('update_user') %}
         <a href="{{ url_for('users.user_edit', user_id=u.id) }}" class="btn btn-sm btn-primary">Editar</a>
