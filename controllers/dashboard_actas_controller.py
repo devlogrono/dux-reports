@@ -352,7 +352,9 @@ def index():
     if equipo_id is not None:
         rows_stats = []
         try:
-            # Intento con filtro de competición en jornadas
+            # Intento principal: usar la relación Jornadas -> Competiciones -> Actas
+            # para quedarnos solo con las filas de actas del equipo cuyo id_equipo = equipo_id
+            # y dentro de la competición seleccionada.
             sql_stats = text(
                 "SELECT a.jugador, "
                 "       COALESCE(SUM(a.goles), 0) AS goles, "
@@ -361,12 +363,15 @@ def index():
                 "       COALESCE(SUM(a.tarjetas_rojas), 0) AS tr "
                 "FROM jornadas j "
                 "JOIN actas a ON a.acta_id = j.acta_id "
-                "WHERE (j.id_equipo_local = :eq OR j.id_equipo_visitante = :eq) "
-                "  AND j.competicion = :comp "
+                "LEFT JOIN competiciones cl ON j.id_equipo_local = cl.id_equipo "
+                "LEFT JOIN competiciones cv ON j.id_equipo_visitante = cv.id_equipo "
+                "WHERE ( (j.id_equipo_local = :eq AND cl.competicion = :comp AND a.equipo = cl.nombre_equipo) "
+                "     OR (j.id_equipo_visitante = :eq AND cv.competicion = :comp AND a.equipo = cv.nombre_equipo) ) "
                 "GROUP BY a.jugador"
             )
             rows_stats = db.session.execute(
-                sql_stats, {"eq": equipo_id, "comp": competicion_sel}
+                sql_stats,
+                {"eq": equipo_id, "comp": competicion_sel},
             ).fetchall()
         except Exception as exc:
             print(
@@ -374,6 +379,8 @@ def index():
                 exc,
             )
             try:
+                # Fallback sin usar la columna competicion en jornadas (por si no existiera),
+                # pero manteniendo la lógica de cruzar ids con nombres en competiciones.
                 sql_stats = text(
                     "SELECT a.jugador, "
                     "       COALESCE(SUM(a.goles), 0) AS goles, "
@@ -382,7 +389,10 @@ def index():
                     "       COALESCE(SUM(a.tarjetas_rojas), 0) AS tr "
                     "FROM jornadas j "
                     "JOIN actas a ON a.acta_id = j.acta_id "
-                    "WHERE j.id_equipo_local = :eq OR j.id_equipo_visitante = :eq "
+                    "LEFT JOIN competiciones cl ON j.id_equipo_local = cl.id_equipo "
+                    "LEFT JOIN competiciones cv ON j.id_equipo_visitante = cv.id_equipo "
+                    "WHERE ( (j.id_equipo_local = :eq AND a.equipo = cl.nombre_equipo) "
+                    "     OR (j.id_equipo_visitante = :eq AND a.equipo = cv.nombre_equipo) ) "
                     "GROUP BY a.jugador"
                 )
                 rows_stats = db.session.execute(
