@@ -211,11 +211,13 @@ def index():
     # --- Diferencia de goles por jornada (bar chart) ---
     diff_jornadas_labels = []
     diff_jornadas_values = []
+    diff_jornadas_ticks = []
 
     # equipo_sel: selección explícita (para resaltar escudos)
     # equipo_titulo: equipo que se muestra en el título / se usa por defecto en el gráfico
     equipo_titulo = None
     equipo_id = None
+    equipo_info_por_id = {}
     if competicion_sel:
         try:
             if equipo_sel:
@@ -254,6 +256,27 @@ def index():
             print("[dashboard_actas] equipo_id para diff jornadas:", equipo_id, "equipo_sel:", equipo_sel, "equipo_titulo:", equipo_titulo)
         except Exception as exc:
             print("[dashboard_actas] Error obteniendo equipo_id para diff jornadas:", exc)
+
+    if competicion_sel:
+        try:
+            sql_eq_info = text(
+                "SELECT DISTINCT id_equipo, nombre_equipo, url_escudo_equipo "
+                "FROM competiciones "
+                "WHERE competicion = :comp "
+                "  AND id_equipo IS NOT NULL"
+            )
+            rows_eq_info = db.session.execute(
+                sql_eq_info, {"comp": competicion_sel}
+            ).fetchall()
+            equipo_info_por_id = {
+                r[0]: {"nombre": r[1] or "", "escudo": r[2] or ""}
+                for r in rows_eq_info
+            }
+        except Exception as exc:
+            print(
+                "[dashboard_actas] Error leyendo info equipos para diff jornadas:",
+                exc,
+            )
 
     if equipo_id is not None:
         try:
@@ -298,6 +321,30 @@ def index():
 
                 diff_jornadas_labels.append(str(jornada))
                 diff_jornadas_values.append(diff)
+
+                nombre_loc = ""
+                nombre_vis = ""
+                escudo_loc = ""
+                escudo_vis = ""
+                if equipo_info_por_id:
+                    info_loc = equipo_info_por_id.get(id_loc)
+                    info_vis = equipo_info_por_id.get(id_vis)
+                    if info_loc:
+                        nombre_loc = info_loc.get("nombre") or ""
+                        escudo_loc = info_loc.get("escudo") or ""
+                    if info_vis:
+                        nombre_vis = info_vis.get("nombre") or ""
+                        escudo_vis = info_vis.get("escudo") or ""
+
+                marcador = f"{g_loc}-{g_vis}"
+                tick_meta = {
+                    "label": f"{nombre_loc} {marcador} {nombre_vis}".strip(),
+                    "loc_escudo": escudo_loc,
+                    "vis_escudo": escudo_vis,
+                    "loc_goles": int(g_loc),
+                    "vis_goles": int(g_vis),
+                }
+                diff_jornadas_ticks.append(tick_meta)
         except Exception as exc:
             print("[dashboard_actas] Error calculando diff jornadas:", exc)
 
@@ -433,6 +480,7 @@ def index():
         equipo_sel=equipo_sel,
         diff_jornadas_labels=diff_jornadas_labels,
         diff_jornadas_values=diff_jornadas_values,
+        diff_jornadas_ticks=diff_jornadas_ticks,
         equipo_titulo=equipo_titulo,
         max_tarjetas_total=max_tarjetas_total,
         goles_favor_total=goles_favor_total,

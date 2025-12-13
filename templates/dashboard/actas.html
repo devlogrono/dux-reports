@@ -278,7 +278,8 @@
         <div class="w-100" style="height: 280px;">
           <canvas id="chart-diff-goles"
                   data-labels='{{ diff_jornadas_labels|tojson }}'
-                  data-values='{{ diff_jornadas_values|tojson }}'></canvas>
+                  data-values='{{ diff_jornadas_values|tojson }}'
+                  data-ticks='{{ diff_jornadas_ticks|tojson }}'></canvas>
         </div>
       </div>
     </div>
@@ -297,6 +298,7 @@
     if (!el) return;
     const labels = JSON.parse(el.dataset.labels || '[]');
     const rawValues = JSON.parse(el.dataset.values || '[]');
+    const tickMeta = JSON.parse(el.dataset.ticks || '[]');
     const displayValues = rawValues.map(v => v === 0 ? 0.25 : v);
     const ctx = el.getContext('2d');
 
@@ -315,6 +317,89 @@
 
     if (window.ChartDataLabels) {
       Chart.register(ChartDataLabels);
+    }
+
+    const escudoCache = {};
+    const escudoLabelsPlugin = {
+      id: 'escudoLabels',
+      afterDatasetsDraw(chart, args, opts) {
+        const meta = chart.getDatasetMeta(0);
+        if (!meta || !meta.data || !Array.isArray(tickMeta)) return;
+
+        const ctx = chart.ctx;
+        const yScale = chart.scales.y;
+
+        tickMeta.forEach((item, index) => {
+          if (!item) return;
+          const bar = meta.data[index];
+          if (!bar) return;
+
+          const raw = rawValues[index] ?? 0;
+          const pos = bar.tooltipPosition();
+          const zeroY = yScale.getPixelForValue(0);
+
+          let y;
+          if (raw >= 0) {
+            // Diferencia positiva o empate: escudos+marcador por encima de la barra
+            y = Math.min(pos.y, zeroY) - 24;
+          } else {
+            // Diferencia negativa: escudos+marcador por debajo de la barra
+            y = Math.max(pos.y, zeroY) + 24;
+          }
+
+          const size = 18;
+          const gap = 4;
+          const score = `${item.loc_goles}-${item.vis_goles}`;
+
+          ctx.save();
+          ctx.font = 'bold 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+          ctx.fillStyle = '#111';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const textWidth = ctx.measureText(score).width;
+          const totalWidth = size * 2 + gap * 3 + textWidth;
+          let startX = pos.x - totalWidth / 2;
+
+          function drawEscudo(url, x, yPos) {
+            if (!url) return;
+            let img = escudoCache[url];
+            if (!img) {
+              img = new Image();
+              img.src = url;
+              img.onload = () => {
+                chart.draw();
+              };
+              escudoCache[url] = img;
+            }
+            if (!img.complete) return;
+
+            ctx.save();
+            const radius = size / 2;
+            ctx.beginPath();
+            ctx.arc(x + radius, yPos + radius, radius, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.clip();
+            ctx.drawImage(img, x, yPos, size, size);
+            ctx.restore();
+          }
+
+          drawEscudo(item.loc_escudo, startX, y - size / 2);
+          startX += size + gap;
+
+          const textX = startX + textWidth / 2;
+          ctx.fillText(score, textX, y);
+          startX += textWidth + gap;
+
+          drawEscudo(item.vis_escudo, startX, y - size / 2);
+
+          ctx.restore();
+        });
+      }
+    };
+
+    if (window.Chart) {
+      Chart.register(escudoLabelsPlugin);
     }
 
     const backgroundColors = rawValues.map(v =>
@@ -361,24 +446,7 @@
         plugins: {
           legend: { display: false },
           datalabels: {
-            color: '#111',
-            font: {
-              weight: 'bold'
-            },
-            clamp: true,
-            formatter: (value, context) => {
-              const raw = rawValues[context.dataIndex] ?? 0;
-              return raw;
-            },
-            anchor: (context) => {
-              const raw = rawValues[context.dataIndex] ?? 0;
-              return raw >= 0 ? 'end' : 'start';
-            },
-            align: (context) => {
-              const raw = rawValues[context.dataIndex] ?? 0;
-              return raw >= 0 ? 'end' : 'start';
-            },
-            offset: 4
+            display: false
           }
         }
       }
