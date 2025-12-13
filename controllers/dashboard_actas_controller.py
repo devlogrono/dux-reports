@@ -268,6 +268,8 @@ def index():
             print("[dashboard_actas] jornadas encontradas:", len(rows_j))
             for r in rows_j:
                 jornada, id_loc, id_vis, g_loc, g_vis = r
+                if g_loc in (None, "") or g_vis in (None, ""):
+                    continue
                 try:
                     g_loc = int(g_loc or 0)
                     g_vis = int(g_vis or 0)
