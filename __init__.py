@@ -27,6 +27,15 @@ def create_app(config_object: type[Config] | None = None) -> Flask:
         instance_relative_config=False,
     )
 
+    def _iso2_to_flag(code: str) -> str:
+        if not code or len(code) != 2:
+            return code or ""
+        # Convierte 'ES' -> 🇪🇸 usando indicadores regionales Unicode
+        base = 127397
+        return "".join(chr(base + ord(c.upper())) for c in code)
+
+    app.jinja_env.filters["flag_emoji"] = _iso2_to_flag
+
     # Load configuration
     app.config.from_object(config_object or Config)
 
@@ -107,6 +116,8 @@ def create_app(config_object: type[Config] | None = None) -> Flask:
     from .controllers.state_user_controller import state_user_bp
     from .controllers.jugadores_controller import jugadores_bp
     from .controllers.users_controller import users_bp
+    from .controllers.dashboard_actas_controller import bp as dashboard_actas_bp
+    from .controllers.dashboard_futbolistas_controller import bp as dashboard_futbolistas_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -120,6 +131,8 @@ def create_app(config_object: type[Config] | None = None) -> Flask:
     app.register_blueprint(state_user_bp)
     app.register_blueprint(jugadores_bp)
     app.register_blueprint(users_bp)
+    app.register_blueprint(dashboard_actas_bp)
+    app.register_blueprint(dashboard_futbolistas_bp)
 
     # Root route -> redirect to dashboard or login
     @app.get("/")

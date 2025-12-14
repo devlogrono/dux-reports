@@ -14,11 +14,9 @@ class Config:
     # # Evitar que SQLAlchemy imprima todas las consultas en consola
     # SQLALCHEMY_ECHO = False
 
-    # Cadena de conexión a RDS
-    SQLALCHEMY_DATABASE_URI = (
-        os.getenv("SQLALCHEMY_DATABASE_URI")
-        or "mysql+pymysql://admin:<PASSWORD>@dpe.cl0glysfjbui.eu-west-1.rds.amazonaws.com:3306/db_dux"
-    )
+    # Cadena de conexión a RDS (leer siempre desde variable de entorno)
+    # Definir SQLALCHEMY_DATABASE_URI en tu .env o entorno del sistema
+    SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Flask-WTF

@@ -1,0 +1,484 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Dashboard · Actas{% endblock %}
+{% block extra_css %}
+<style>
+  body{
+    background: url("{{ url_for('static', filename='img/fondo8.jpg') }}") no-repeat center center fixed;
+    background-size: cover;
+  }
+
+  .dashboard-card {
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 1rem;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+    backdrop-filter: blur(6px);
+  }
+
+  .escudos-grid {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0.5rem 0;
+  }
+
+  .escudos-strip {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .escudo-item {
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .escudo-item img {
+    height: var(--escudo-size, 60px);
+    width: auto;
+    object-fit: contain;
+    transition: transform 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+  }
+
+  .filter-card {
+    padding-top: 0.4rem !important;
+    padding-bottom: 0.4rem !important;
+  }
+
+  #competicion.form-select {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    font-size: 0.85rem;
+  }
+
+  .escudo-selected img {
+    opacity: 1;
+    filter: drop-shadow(0 0 8px rgba(15, 23, 42, 0.4));
+    transform: scale(1.06);
+  }
+
+  .escudo-dim img {
+    opacity: 0.35;
+    filter: grayscale(70%);
+  }
+
+  .escudos-strip a {
+    text-decoration: none;
+  }
+
+  .escudo-item:hover img {
+    opacity: 1;
+    filter: grayscale(0);
+    transform: scale(1.08);
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row g-4 mb-4 align-items-stretch">
+    <div class="col-lg-3 col-md-4">
+      <div class="d-flex flex-column h-100 gap-3">
+        <div class="dashboard-card filter-card p-2">
+          <form method="get" class="mb-0">
+            <div class="mb-0">
+              <label for="competicion" class="form-label mb-1">Competición</label>
+              {% set selected_comp = competicion_sel or '1FF' %}
+              <select id="competicion" name="competicion" class="form-select" onchange="this.form.submit()">
+                {% if not competiciones %}
+                  <option value="">(Sin competiciones)</option>
+                {% else %}
+                  {% for c in competiciones %}
+                    <option value="{{ c.id }}" {% if c.id == selected_comp %}selected{% endif %}>{{ c.nombre }}</option>
+                  {% endfor %}
+                {% endif %}
+              </select>
+            </div>
+          </form>
+        </div>
+
+        <div class="dashboard-card p-3 d-flex flex-column justify-content-center">
+          <div class="row text-center g-2">
+            <div class="col-4 col-md-2" title="Victorias">
+              <div class="mb-1">
+                <span class="badge rounded-circle bg-success">V</span>
+              </div>
+              <div class="fw-bold">{{ victorias_total or 0 }}</div>
+            </div>
+            <div class="col-4 col-md-2" title="Empates">
+              <div class="mb-1">
+                <span class="badge rounded-circle bg-secondary">E</span>
+              </div>
+              <div class="fw-bold">{{ empates_total or 0 }}</div>
+            </div>
+            <div class="col-4 col-md-2" title="Derrotas">
+              <div class="mb-1">
+                <span class="badge rounded-circle bg-danger">D</span>
+              </div>
+              <div class="fw-bold">{{ derrotas_total or 0 }}</div>
+            </div>
+            <div class="col-4 col-md-2" title="Goles a favor">
+              <div class="mb-1">
+                <span class="badge rounded-circle bg-success">GF</span>
+              </div>
+              <div class="fw-bold">{{ goles_favor_total or 0 }}</div>
+            </div>
+            <div class="col-4 col-md-2" title="Goles en contra">
+              <div class="mb-1">
+                <span class="badge rounded-circle bg-danger">GC</span>
+              </div>
+              <div class="fw-bold">{{ goles_contra_total or 0 }}</div>
+            </div>
+            <div class="col-4 col-md-2" title="Tarjetas (amarillas + rojas)">
+              <div class="mb-1">
+                <span class="badge rounded-circle bg-warning text-dark">T</span>
+              </div>
+              <div class="fw-bold">{{ total_tarjetas_equipo or 0 }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-9 col-md-8">
+      <div class="dashboard-card p-3 h-100">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="text-uppercase text-muted small mb-0">Equipos</h6>
+          <span class="badge bg-light text-dark small">{{ escudos|length }} equipos</span>
+        </div>
+        {% set n_escudos = escudos|length %}
+        {% if n_escudos %}
+          {% set escudo_size = 90 if n_escudos <= 8 else 70 if n_escudos <= 16 else 55 if n_escudos <= 24 else 45 %}
+          <div class="escudos-grid" style="--escudo-size: {{ escudo_size }}px;">
+            <div class="escudos-strip">
+              {% for e in escudos %}
+                {% set is_selected = equipo_sel and e.nombre == equipo_sel %}
+                <div class="escudo-item {{ 'escudo-selected' if is_selected else ('escudo-dim' if equipo_sel else '') }}">
+                  <a href="{{ url_for('dashboard_actas.index', competicion=competicion_sel) if is_selected else url_for('dashboard_actas.index', competicion=competicion_sel, equipo=e.nombre) }}"
+                     title="{{ e.nombre or '' }}">
+                    <img src="{{ e.url }}"
+                         alt="{{ e.nombre or ('Escudo ' ~ loop.index) }}"
+                         class="img-fluid">
+                  </a>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% else %}
+            <div class="text-center text-muted py-5">
+              <p class="mb-1">No se han encontrado escudos para esta competición.</p>
+              <p class="small mb-0">Comprueba que la tabla <code>competiciones</code> tiene datos y que la columna de escudos está informada.</p>
+            </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-4">
+      <div class="dashboard-card p-3 h-100 d-flex flex-column">
+        <h6 class="text-uppercase text-muted small mb-2">Tarjetas</h6>
+        {% if tarjetas %}
+          {% set max_total = max_tarjetas_total or 0 %}
+          <div class="w-100" style="max-height: 260px; overflow-y: auto;">
+            {% for t in tarjetas %}
+              {% set amar = t.amarillas %}
+              {% set roj = t.rojas %}
+              {% if amar > 0 and roj == 0 %}
+                {% set barra_color = 'rgba(241,196,15,0.7)' %}
+              {% elif amar == 0 and roj > 0 %}
+                {% set barra_color = 'rgba(220,53,69,0.65)' %}
+              {% elif amar >= roj %}
+                {% set barra_color = 'rgba(241,196,15,0.7)' %}
+              {% else %}
+                {% set barra_color = 'rgba(220,53,69,0.65)' %}
+              {% endif %}
+
+              {% if t.rojas %}
+              {# Fila con bloque rojo a la derecha cuando hay tarjetas rojas #}
+              <div class="d-flex justify-content-between align-items-stretch mb-1 small"
+                   style="background-color: {{ barra_color }}; border-radius: 4px; overflow: hidden;">
+                <span class="text-start text-wrap" style="flex:1; text-align:left; padding: 4px 8px;">
+                  {{ t.jugador }}
+                </span>
+                <div class="d-flex align-items-stretch">
+                  {% if t.amarillas %}
+                    <div class="d-flex align-items-center px-2" style="padding-top: 4px; padding-bottom: 4px;">
+                      <span class="fw-bold" style="color: #000;">
+                        {{ t.amarillas }}
+                      </span>
+                    </div>
+                  {% endif %}
+                  <div class="d-flex align-items-center" style="background-color: rgba(220,53,69,0.9); padding: 4px 10px;">
+                    <span class="fw-bold" style="color: #000;">
+                      {{ t.rojas }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {% else %}
+              {# Fila normal cuando no hay tarjetas rojas #}
+              <div class="d-flex justify-content-between align-items-center mb-1 small"
+                   style="background-color: {{ barra_color }}; border-radius: 4px; padding: 4px 8px;">
+                <span class="text-start text-wrap" style="flex:1; text-align:left;">{{ t.jugador }}</span>
+                <div class="d-flex align-items-center gap-1 ms-2">
+                  {% if t.amarillas %}
+                    <span class="fw-bold px-1" style="color: #000;">
+                      {{ t.amarillas }}
+                    </span>
+                  {% endif %}
+                  {% if t.rojas %}
+                    <span class="fw-bold px-1" style="color: #000;">
+                      {{ t.rojas }}
+                    </span>
+                  {% endif %}
+                </div>
+              </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="mb-0 text-muted small">Sin datos de tarjetas.</p>
+        {% endif %}
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="dashboard-card p-3 h-100 d-flex flex-column">
+        <h6 class="text-uppercase text-muted small mb-2">Goles</h6>
+        {% if goles %}
+          {% set max_goles = goles | map(attribute='valor') | max %}
+          <div class="w-100" style="max-height: 260px; overflow-y: auto;">
+            {% for g in goles %}
+              {% set intensity = (g.valor / max_goles) if max_goles else 0 %}
+              {% set alpha = 0.15 + 0.65 * intensity %}
+              <div class="d-flex justify-content-between align-items-center mb-1 small"
+                   style="background-color: rgba(220,53,69, {{ alpha }}); border-radius: 4px; padding: 4px 8px;">
+                <span class="text-start text-wrap" style="flex:1; text-align:left;">{{ g.jugador }}</span>
+                <span class="fw-bold ms-2">{{ g.valor }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="mb-0 text-muted small">Sin datos de goles.</p>
+        {% endif %}
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="dashboard-card p-3 h-100 d-flex flex-column">
+        <h6 class="text-uppercase text-muted small mb-2">Minutos</h6>
+        {% if minutos %}
+          {% set max_minutos = minutos | map(attribute='valor') | max %}
+          <div class="w-100" style="max-height: 260px; overflow-y: auto;">
+            {% for m in minutos %}
+              {% set intensity = (m.valor / max_minutos) if max_minutos else 0 %}
+              {% set alpha = 0.15 + 0.65 * intensity %}
+              <div class="d-flex justify-content-between align-items-center mb-1 small"
+                   style="background-color: rgba(220,53,69, {{ alpha }}); border-radius: 4px; padding: 4px 8px;">
+                <span class="text-start text-wrap" style="flex:1; text-align:left;">{{ m.jugador }}</span>
+                <span class="fw-bold ms-2">{{ m.valor }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="mb-0 text-muted small">Sin datos de minutos.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12">
+      <div class="dashboard-card p-3 h-100 d-flex flex-column justify-content-center align-items-center text-center">
+        <h6 class="text-uppercase text-muted small mb-2">
+          {% if equipo_titulo %}
+            Diferencia de goles por jornada - {{ equipo_titulo }}
+          {% else %}
+            Diferencia de goles por jornada
+          {% endif %}
+        </h6>
+        <div class="w-100" style="height: 280px;">
+          <canvas id="chart-diff-goles"
+                  data-labels='{{ diff_jornadas_labels|tojson }}'
+                  data-values='{{ diff_jornadas_values|tojson }}'
+                  data-ticks='{{ diff_jornadas_ticks|tojson }}'></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  <script>
+  // Gráfico de diferencia de goles por jornada
+  (function() {
+    const el = document.getElementById('chart-diff-goles');
+    if (!el) return;
+    const labels = JSON.parse(el.dataset.labels || '[]');
+    const rawValues = JSON.parse(el.dataset.values || '[]');
+    const tickMeta = JSON.parse(el.dataset.ticks || '[]');
+    const displayValues = rawValues.map(v => v === 0 ? 0.25 : v);
+    const ctx = el.getContext('2d');
+
+    if (!labels.length || !displayValues.length) {
+      return;
+    }
+
+    const maxVal = Math.max(...displayValues, 0);
+    const minVal = Math.min(...displayValues, 0);
+    let yMax = maxVal + 3;
+    let yMin = minVal - 3;
+    if (maxVal === 0 && minVal === 0) {
+      yMax = 2;
+      yMin = -2;
+    }
+
+    if (window.ChartDataLabels) {
+      Chart.register(ChartDataLabels);
+    }
+
+    const escudoCache = {};
+    const escudoLabelsPlugin = {
+      id: 'escudoLabels',
+      afterDatasetsDraw(chart, args, opts) {
+        const meta = chart.getDatasetMeta(0);
+        if (!meta || !meta.data || !Array.isArray(tickMeta)) return;
+
+        const ctx = chart.ctx;
+        const yScale = chart.scales.y;
+
+        tickMeta.forEach((item, index) => {
+          if (!item) return;
+          const bar = meta.data[index];
+          if (!bar) return;
+
+          const raw = rawValues[index] ?? 0;
+          const pos = bar.tooltipPosition();
+          const zeroY = yScale.getPixelForValue(0);
+
+          let y;
+          if (raw >= 0) {
+            // Diferencia positiva o empate: escudos+marcador por encima de la barra
+            y = Math.min(pos.y, zeroY) - 24;
+          } else {
+            // Diferencia negativa: escudos+marcador por debajo de la barra
+            y = Math.max(pos.y, zeroY) + 24;
+          }
+
+          const size = 18;
+          const gap = 4;
+          const score = `${item.loc_goles}-${item.vis_goles}`;
+
+          ctx.save();
+          ctx.font = 'bold 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+          ctx.fillStyle = '#111';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const textWidth = ctx.measureText(score).width;
+          const totalWidth = size * 2 + gap * 3 + textWidth;
+          let startX = pos.x - totalWidth / 2;
+
+          function drawEscudo(url, x, yPos) {
+            if (!url) return;
+            let img = escudoCache[url];
+            if (!img) {
+              img = new Image();
+              img.src = url;
+              img.onload = () => {
+                chart.draw();
+              };
+              escudoCache[url] = img;
+            }
+            if (!img.complete) return;
+
+            ctx.save();
+            const radius = size / 2;
+            ctx.beginPath();
+            ctx.arc(x + radius, yPos + radius, radius, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.clip();
+            ctx.drawImage(img, x, yPos, size, size);
+            ctx.restore();
+          }
+
+          drawEscudo(item.loc_escudo, startX, y - size / 2);
+          startX += size + gap;
+
+          const textX = startX + textWidth / 2;
+          ctx.fillText(score, textX, y);
+          startX += textWidth + gap;
+
+          drawEscudo(item.vis_escudo, startX, y - size / 2);
+
+          ctx.restore();
+        });
+      }
+    };
+
+    if (window.Chart) {
+      Chart.register(escudoLabelsPlugin);
+    }
+
+    const backgroundColors = rawValues.map(v =>
+      v > 0 ? 'rgba(25, 135, 84, 0.7)' :
+      v < 0 ? 'rgba(220, 53, 69, 0.7)' :
+              'rgba(108, 117, 125, 0.7)'
+    );
+    const borderColors = rawValues.map(v =>
+      v > 0 ? '#198754' :
+      v < 0 ? '#dc3545' :
+              '#6c757d'
+    );
+
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Diferencia de goles',
+          data: displayValues,
+          backgroundColor: backgroundColors,
+          borderColor: borderColors,
+          borderWidth: 1,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            display: false,
+            grid: { display: false },
+            min: yMin,
+            max: yMax
+          },
+          x: {
+            title: {
+              display: true,
+              text: 'Jornada'
+            },
+            grid: { display: false }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: false
+          },
+          datalabels: {
+            display: false
+          }
+        }
+      }
+    });
+  })();
+</script>
+{% endblock %}

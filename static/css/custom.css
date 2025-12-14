@@ -1,0 +1,148 @@
+/* ======= DUX Theme ======= */
+:root{
+  --dux-primary: #7C2629;
+  --dux-primary-600: #6e2124;   /* un poco más oscuro para hover */
+  --dux-primary-300: #a05558;   /* un poco más claro para active/badges */
+  --dux-contrast: #ffffff;
+  --dux-bg: #f6f4f4;            /* fondo suave */
+  --dux-text: #1f2937;          /* gris oscuro legible */
+}
+
+/* Fondo general y tipografía */
+body {
+  background: var(--dux-bg);
+  color: var(--dux-text);
+}
+
+/* ======= NAVBAR ======= */
+.navbar {
+  background: var(--dux-primary) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.15);
+}
+.navbar .navbar-brand,
+.navbar .nav-link,
+.navbar .navbar-text {
+  color: var(--dux-contrast) !important;
+}
+.navbar .nav-link:hover,
+.navbar .nav-link:focus {
+  color: #ffffff !important;
+  background: rgba(255,255,255,0.08);
+  border-radius: .5rem;
+}
+.navbar .dropdown-menu {
+  border-radius: .5rem;
+  border: 1px solid rgba(0,0,0,0.07);
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+}
+.navbar .dropdown-item:hover {
+  background: rgba(124,38,41,0.08);
+}
+
+/* Logo de marca en la izquierda */
+.navbar-brand img {
+  height: 40px;        /* ajusta si quieres más pequeño */
+  width: auto;
+  display: block;
+}
+
+/* ======= BOTONES ======= */
+.btn-primary {
+  background: var(--dux-primary);
+  border-color: var(--dux-primary);
+}
+.btn-primary:hover,
+.btn-primary:focus {
+  background: var(--dux-primary-600);
+  border-color: var(--dux-primary-600);
+}
+.btn-outline-primary {
+  color: var(--dux-primary);
+  border-color: var(--dux-primary);
+}
+.btn-outline-primary:hover {
+  background: var(--dux-primary);
+  color: var(--dux-contrast);
+}
+
+/* ======= LINKS ======= */
+a { color: var(--dux-primary); }
+a:hover { color: var(--dux-primary-600); }
+
+/* ======= CARDS / CONTENEDORES ======= */
+.card {
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: .75rem;
+  box-shadow: 0 6px 18px rgba(0,0,0,.06);
+}
+.card-header {
+  background: #fff;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+/* ======= TITULARES ======= */
+h1, h2, h3 {
+  color: #111827;
+}
+.badge-primary, .bg-primary {
+  background: var(--dux-primary) !important;
+}
+
+/* ======= FOOTER ======= */
+.site-footer {
+  background: #eeeeee;
+  color: #6b7280;
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+
+/* ======= Estados (badges con colores) ======= */
+/* Normalizamos texto -> clases con lower + replace(' ', '-') + sin puntos en template */
+
+.estado-badge.activo { 
+  background-color: #198754;  /* verde */
+  color: #fff;
+}
+.estado-badge.pte-actualizacion {
+  background-color: #a86500;  /* naranja oscuro */
+  color: #fff;
+}
+.estado-badge.pte-documentacion {
+  background-color: #c79200;  /* amarillo oscuro / naranja claro */
+  color: #111;
+}
+.estado-badge.pte-federacion {
+  background-color: #ffc107;  /* amarillo */
+  color: #111;
+}
+.estado-badge.pte-pago {
+  background-color: #dc3545;  /* rojo */
+  color: #fff;
+}
+
+/* Filas con reconocimiento médico vencido ya usan .table-danger de Bootstrap */
+/* === Ajustes para flag-icons === */
+.fi {
+  width: 1.4em !important;
+  height: 1em !important;
+  border-radius: 2px;
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.2);
+  vertical-align: middle;
+}
+
+/* Tabla de Gestión de Futbolistas: centrado global */
+.table-jugadores th,
+.table-jugadores td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* Avatar del futbolista (columna Futbolista) */
+.jugador-avatar {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+  margin: 0 auto;
+  box-shadow: 0 0 2px rgba(0,0,0,.25);
+}

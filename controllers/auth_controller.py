@@ -140,7 +140,8 @@ def reset_password_post(token):
     User=_get_user_class();user=db.session.query(User).filter_by(email=email).first() if User else None
     if not user:
         flash("Usuario no encontrado", "danger");return redirect(url_for('auth.login_get'))
-    import hashlib;user.password_hash=hashlib.sha256(form.password.data.encode()).hexdigest();db.session.commit()
+    # Guardar contraseña usando bcrypt
+    user.password_hash=bcrypt.generate_password_hash(form.password.data).decode("utf-8");db.session.commit()
     flash("Contraseña actualizada, inicia sesión", "success")
     return redirect(url_for('auth.login_get'))
 
@@ -195,9 +196,28 @@ def login_post():
         flash("Modelo de usuario no disponible", "danger")
         return redirect(url_for("auth.login_get"))
 
-    user = db.session.query(User).filter_by(email=form.email.data).first()
+    # Normalizar email igual que al guardar usuarios (lower + strip)
+    email_input = (form.email.data or "").strip().lower()
+    user = db.session.query(User).filter(User.email == email_input).first()
 
-    if user and user.password_hash and user.password_hash.lower() == hashlib.sha256(form.password.data.encode()).hexdigest():
+    ok = False
+    if user and user.password_hash:
+        # Primero intentamos validar como bcrypt
+        try:
+            ok = bcrypt.check_password_hash(user.password_hash, form.password.data)
+        except Exception:
+            ok = False
+
+        # Compatibilidad con hashes antiguos en SHA256 (64 caracteres hex)
+        if not ok and len(user.password_hash) == 64:
+            legacy = hashlib.sha256(form.password.data.encode()).hexdigest()
+            if user.password_hash.lower() == legacy:
+                ok = True
+                # Migrar a bcrypt
+                user.password_hash = bcrypt.generate_password_hash(form.password.data).decode("utf-8")
+                db.session.commit()
+
+    if ok:
         _audit_event(user.id, True, "LOGIN")
         login_user(user, remember=form.remember.data)
         return redirect("/")

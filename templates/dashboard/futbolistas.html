@@ -1,0 +1,223 @@
+{% extends "layouts/base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>Dashboard Futbolistas</h1>
+
+    {# Tabs locales para navegar entre dashboards, preservando filtros #}
+    {% set ns = namespace(qs=[]) %}
+    {% for n in seleccionadas %}{% set ns.qs = ns.qs + ['jugadoras=' ~ n|urlencode] %}{% endfor %}
+    {% for c in seleccionadas_competicion %}{% set ns.qs = ns.qs + ['competicion=' ~ c|urlencode] %}{% endfor %}
+    {% set qstr = '?' ~ ns.qs|join('&') if ns.qs else '' %}
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.index' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.index') }}{{ qstr }}">Participaciones</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.caracteristicas' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.caracteristicas') }}{{ qstr }}">Características</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.estadisticas' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.estadisticas') }}{{ qstr }}">Estadísticas</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.analisis_equipo' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.analisis_equipo') }}{{ qstr }}">Análisis equipo</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.sustituciones' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.sustituciones') }}{{ qstr }}">Sustituciones</a>
+        </li>
+
+    </ul>
+
+    <!-- Filtros centrados y con ancho contenido -->
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10 col-xl-8">
+            <form method="get" id="filtros-form" class="mb-4">
+                <div class="row g-3 align-items-end">
+                    <!-- Filtro por Futbolistas -->
+                    <div class="col-md-5">
+                        <label for="jugadoras">Seleccionar futbolistas</label>
+                        <select name="jugadoras" id="jugadoras" multiple class="form-select">
+                            {% for f in futbolistas %}
+                                <option value="{{ f.nombre_completo }}"
+                                    {% if f.nombre_completo in seleccionadas %} selected {% endif %}>
+                                    {{ f.nombre_completo }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Filtro por Competición -->
+                    <div class="col-md-5">
+                        <label for="competicion">Seleccionar Competición</label>
+                        <select name="competicion" id="competicion" multiple class="form-select">
+                            {% for c in competiciones %}
+                                <option value="{{ c }}"
+                                    {% if c in seleccionadas_competicion %} selected {% endif %}>
+                                    {{ c }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Botones -->
+                    <div class="col-md-2 d-flex flex-column">
+                        <button type="submit" class="btn btn-primary mb-2">Aplicar filtros</button>
+                        <button type="button" id="limpiar-filtros" class="btn btn-secondary">Limpiar filtros</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Gráfico -->
+    <div class="rounded shadow-sm p-3" style="background-color: rgba(255,255,255,0.9);">
+        <div class="d-flex justify-content-between flex-wrap gap-2 mb-2">
+            <div class="d-flex align-items-center gap-2">
+                <label for="select-top" class="mb-0 small text-muted">Top N</label>
+                <select id="select-top" class="form-select form-select-sm" style="width:auto;min-width:120px;">
+                    <option value="all" selected>Todos</option>
+                    <option value="10">Top 10</option>
+                    <option value="20">Top 20</option>
+                </select>
+                <div class="form-check form-switch ms-3">
+                    <input class="form-check-input" type="checkbox" id="toggle-datalabels">
+                    <label class="form-check-label small" for="toggle-datalabels">Mostrar valores</label>
+                </div>
+            </div>
+            <div>
+                <button type="button" id="btn-descargar-chart" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-download"></i> Descargar PNG
+                </button>
+            </div>
+        </div>
+        <div class="position-relative" style="height:60vh;">
+            <canvas id="grafico-partidos"
+                data-labels='{{ futbolistas | map(attribute="nombre_completo") | list | tojson }}'
+                data-values='{{ futbolistas | map(attribute="partidos") | list | tojson }}'></canvas>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+<script>
+document.getElementById('limpiar-filtros').addEventListener('click', function() {
+    const jug = document.getElementById('jugadoras');
+    const comp = document.getElementById('competicion');
+    if (jug) jug.selectedIndex = -1;
+    if (comp) comp.selectedIndex = -1;
+    document.getElementById('filtros-form').submit();
+});
+
+const canvasEl = document.getElementById('grafico-partidos');
+const labelsArr = JSON.parse(canvasEl.dataset.labels || '[]');
+const dataArr = JSON.parse(canvasEl.dataset.values || '[]');
+const ctx = canvasEl.getContext('2d');
+// Registrar plugin de datalabels
+if (window.ChartDataLabels) { Chart.register(ChartDataLabels); }
+
+function buildData(labels, values) {
+    return {
+        labels,
+        datasets: [{
+            label: 'Partidos jugados',
+            data: values,
+            backgroundColor: 'rgba(13, 110, 253, 0.7)', // primary bootstrap con opacidad
+            borderColor: '#0d6efd',
+            borderWidth: 1
+        }]
+    };
+}
+
+let chart = new Chart(ctx, {
+    type: 'bar',
+    data: buildData(labelsArr, dataArr),
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false, labels: { color: '#111' } },
+            tooltip: {
+                callbacks: {
+                    title: (items) => {
+                        const i = items[0].dataIndex;
+                        return labelsArr[i];
+                    }
+                }
+            },
+            datalabels: {
+                display: false,
+                color: '#111',
+                anchor: 'end',
+                align: 'top',
+                offset: 2,
+                formatter: (value) => value
+            }
+        },
+        interaction: { mode: 'index', intersect: false },
+        layout: { padding: 16 },
+        elements: { bar: { borderRadius: 4 } },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: { color: '#222', stepSize: 1 },
+                grid: { color: '#e5e7eb', drawBorder: false }
+            },
+            x: {
+                ticks: {
+                    color: '#222',
+                    maxRotation: 45,
+                    autoSkip: true,
+                    callback: function(value, index) {
+                        const lbl = labelsArr[index] || '';
+                        const maxLen = 14;
+                        return lbl.length > maxLen ? lbl.slice(0, maxLen) + '…' : lbl;
+                    }
+                },
+                grid: { color: '#e5e7eb', drawBorder: false }
+            }
+        },
+        backgroundColor: '#fff'
+    }
+});
+
+// Descargar PNG
+document.getElementById('btn-descargar-chart').addEventListener('click', function() {
+    const link = document.createElement('a');
+    link.href = chart.toBase64Image('image/png', 1.0);
+    link.download = 'dashboard-futbolistas.png';
+    link.click();
+});
+
+// Top N selector
+const selTop = document.getElementById('select-top');
+selTop.addEventListener('change', function() {
+    const val = this.value;
+    let idx = labelsArr.map((_, i) => i);
+    idx.sort((a,b) => dataArr[b] - dataArr[a]);
+    let useIdx = idx;
+    if (val !== 'all') {
+        const n = parseInt(val, 10);
+        useIdx = idx.slice(0, n);
+    }
+    const newLabels = useIdx.map(i => labelsArr[i]);
+    const newValues = useIdx.map(i => dataArr[i]);
+    chart.data = buildData(newLabels, newValues);
+    chart.update();
+});
+
+// Toggle datalabels
+const toggleDL = document.getElementById('toggle-datalabels');
+toggleDL.addEventListener('change', function() {
+    chart.options.plugins.datalabels.display = this.checked;
+    chart.update();
+});
+</script>
+{% endblock %}
+{% endblock %}

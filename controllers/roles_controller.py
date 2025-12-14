@@ -6,6 +6,7 @@ from flask_login import login_required
 
 from dux import db
 from dux.models import Base
+from dux.security import require_perm
 
 roles_bp = Blueprint("roles", __name__, url_prefix="/roles")
 
@@ -16,6 +17,7 @@ def _get_roles_model():
 
 @roles_bp.get("/")
 @login_required
+@require_perm("read_role")
 def roles_list():
     Role = _get_roles_model()
     if not Role:
@@ -41,6 +43,7 @@ def roles_list():
 
 @roles_bp.route("/new", methods=["GET", "POST"])
 @login_required
+@require_perm("create_role")
 def role_new():
     Role = _get_roles_model()
     if not Role:
@@ -63,6 +66,7 @@ def role_new():
 
 @roles_bp.route("/<role_id>/edit", methods=["GET", "POST"])
 @login_required
+@require_perm("update_role")
 def role_edit(role_id):
     Role = _get_roles_model()
     if not Role:
@@ -84,6 +88,7 @@ def role_edit(role_id):
 
 @roles_bp.post("/<role_id>/delete")
 @login_required
+@require_perm("delete_role")
 def role_delete(role_id):
     Role = _get_roles_model()
     if not Role:

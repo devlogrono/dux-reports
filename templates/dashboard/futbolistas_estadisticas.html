@@ -1,0 +1,284 @@
+{% extends "layouts/base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>Dashboard Futbolistas</h1>
+
+    {# Tabs locales con preservación de filtros #}
+    {% set ns = namespace(qs=[]) %}
+    {% for n in seleccionadas %}{% set ns.qs = ns.qs + ['jugadoras=' ~ n|urlencode] %}{% endfor %}
+    {% for c in seleccionadas_competicion %}{% set ns.qs = ns.qs + ['competicion=' ~ c|urlencode] %}{% endfor %}
+    {% set qstr = '?' ~ ns.qs|join('&') if ns.qs else '' %}
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('dashboard_futbolistas.index') }}{{ qstr }}">Participaciones</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('dashboard_futbolistas.caracteristicas') }}{{ qstr }}">Características</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link active" href="{{ url_for('dashboard_futbolistas.estadisticas') }}{{ qstr }}">Estadísticas</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.analisis_equipo' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.analisis_equipo') }}{{ qstr }}">Análisis equipo</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.sustituciones' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.sustituciones') }}{{ qstr }}">Sustituciones</a>
+    </li>
+    </ul>
+
+    <!-- Filtros centrados -->
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10 col-xl-8">
+            <form method="get" id="filtros-form" class="mb-4">
+                <div class="row g-3 align-items-end">
+                    <!-- Filtro por Futbolistas -->
+                    <div class="col-md-5">
+                        <label for="jugadoras">Seleccionar futbolistas</label>
+                        <select name="jugadoras" id="jugadoras" multiple class="form-select">
+                            {% for f in futbolistas %}
+                                <option value="{{ f.nombre_completo }}"
+                                    {% if f.nombre_completo in seleccionadas %} selected {% endif %}>
+                                    {{ f.nombre_completo }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Filtro por Competición -->
+                    <div class="col-md-5">
+                        <label for="competicion">Seleccionar Competición</label>
+                        <select name="competicion" id="competicion" multiple class="form-select">
+                            {% for c in competiciones %}
+                                <option value="{{ c }}"
+                                    {% if c in seleccionadas_competicion %} selected {% endif %}>
+                                    {{ c }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Botones -->
+                    <div class="col-md-2 d-flex flex-column">
+                        <button type="submit" class="btn btn-primary mb-2">Aplicar filtros</button>
+                        <button type="button" id="limpiar-filtros" class="btn btn-secondary">Limpiar filtros</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {# Helper macro para header de tarjeta con controles #}
+    {% macro header_controles(titulo, id_top, id_toggle, id_btn_png) %}
+    <div class="d-flex justify-content-between flex-wrap gap-2 mb-2">
+        <div class="d-flex align-items-center gap-2">
+            <h5 class="mb-0">{{ titulo }}</h5>
+            <label for="{{ id_top }}" class="mb-0 small text-muted ms-3">Top N</label>
+            <select id="{{ id_top }}" class="form-select form-select-sm" style="width:auto;min-width:120px;">
+                <option value="all" selected>Todos</option>
+                <option value="10">Top 10</option>
+                <option value="20">Top 20</option>
+            </select>
+            <div class="form-check form-switch ms-3">
+                <input class="form-check-input" type="checkbox" id="{{ id_toggle }}">
+                <label class="form-check-label small" for="{{ id_toggle }}">Mostrar valores</label>
+            </div>
+        </div>
+        <div>
+            <button type="button" id="{{ id_btn_png }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-download"></i> Descargar PNG
+            </button>
+        </div>
+    </div>
+    {% endmacro %}
+
+    <!-- Goles (incluye penales como serie separada) -->
+    <div class="rounded shadow-sm p-3 mb-4" style="background-color: rgba(255,255,255,0.9);">
+        {{ header_controles('Goles por jugador', 'top-goles', 'toggle-goles', 'png-goles') }}
+        <div class="position-relative" style="height:60vh;">
+            <canvas id="chart-goles"
+                data-labels='{{ per_jugador | map(attribute="nombre_completo") | list | tojson }}'
+                data-goles='{{ per_jugador | map(attribute="goles") | list | tojson }}'
+                data-penales='{{ per_jugador | map(attribute="goles_penalty") | list | tojson }}'></canvas>
+        </div>
+    </div>
+
+    <!-- Tarjetas -->
+    <div class="rounded shadow-sm p-3 mb-4" style="background-color: rgba(255,255,255,0.9);">
+        {{ header_controles('Tarjetas por jugador', 'top-tarjetas', 'toggle-tarjetas', 'png-tarjetas') }}
+        <div class="position-relative" style="height:60vh;">
+            <canvas id="chart-tarjetas"
+                data-labels='{{ per_jugador | map(attribute="nombre_completo") | list | tojson }}'
+                data-amarillas='{{ per_jugador | map(attribute="amarillas") | list | tojson }}'
+                data-rojas='{{ per_jugador | map(attribute="rojas") | list | tojson }}'></canvas>
+        </div>
+    </div>
+
+    <!-- Minutos -->
+    <div class="rounded shadow-sm p-3" style="background-color: rgba(255,255,255,0.9);">
+        {{ header_controles('Minutos por jugador', 'top-minutos', 'toggle-minutos', 'png-minutos') }}
+        <div class="position-relative" style="height:60vh;">
+            <canvas id="chart-minutos"
+                data-labels='{{ per_jugador | map(attribute="nombre_completo") | list | tojson }}'
+                data-minutos='{{ per_jugador | map(attribute="minutos") | list | tojson }}'></canvas>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+<script>
+// limpiar filtros
+const btnClear = document.getElementById('limpiar-filtros');
+if (btnClear) btnClear.addEventListener('click', function() {
+    const jug = document.getElementById('jugadoras');
+    const comp = document.getElementById('competicion');
+    if (jug) jug.selectedIndex = -1;
+    if (comp) comp.selectedIndex = -1;
+    document.getElementById('filtros-form').submit();
+});
+
+if (window.ChartDataLabels) { Chart.register(ChartDataLabels); }
+
+function truncLbl(lbl, max=16){ return (lbl||'').length>max ? (lbl.slice(0,max)+'…') : lbl; }
+function mkStackedOptions(){
+  return {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { color: '#111' } },
+      datalabels: { display: false, color: '#111', anchor: 'end', align: 'top', offset: 2 },
+      tooltip: { callbacks: { title: (items)=> items.length? items[0].label : '' } }
+    },
+    interaction: { mode: 'index', intersect: false },
+    elements: { bar: { borderRadius: 4 } },
+    scales: {
+      y: { beginAtZero: true, stacked: true, ticks: { color: '#222' }, grid: { color: '#e5e7eb', drawBorder: false } },
+      x: { stacked: true, ticks: { color: '#222', maxRotation: 45, autoSkip: true,
+            callback: (v,i,vals)=> truncLbl(vals[i].label, 14)
+          }, grid: { color: '#e5e7eb', drawBorder: false } }
+    },
+    backgroundColor: '#fff'
+  };
+}
+function mkSingleOptions(){
+  return {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      datalabels: { display: false, color: '#111', anchor: 'end', align: 'top', offset: 2 },
+      tooltip: { callbacks: { title: (items)=> items.length? items[0].label : '' } }
+    },
+    interaction: { mode: 'index', intersect: false },
+    elements: { bar: { borderRadius: 4 } },
+    scales: {
+      y: { beginAtZero: true, ticks: { color: '#222' }, grid: { color: '#e5e7eb', drawBorder: false } },
+      x: { ticks: { color: '#222', maxRotation: 45, autoSkip: true,
+            callback: (v,i,vals)=> truncLbl(vals[i].label, 14)
+          }, grid: { color: '#e5e7eb', drawBorder: false } }
+    },
+    backgroundColor: '#fff'
+  };
+}
+function applyTop(labels, seriesArrays, topVal){
+  let idx = labels.map((_,i)=>i);
+  // ordenar por suma de series si hay múltiples, si no por única serie
+  const keyArr = seriesArrays[0] || [];
+  idx.sort((a,b)=> {
+    const sum = (arrs, i)=> arrs.reduce((ac,ar)=> ac + (parseFloat(ar[i])||0), 0);
+    return sum(seriesArrays,b) - sum(seriesArrays,a);
+  });
+  let use = idx;
+  if (topVal !== 'all') use = idx.slice(0, parseInt(topVal,10));
+  return {
+    labels: use.map(i=> labels[i]),
+    series: seriesArrays.map(arr=> use.map(i=> arr[i]))
+  };
+}
+function bindCommonControls(chart, topSelId, toggleId){
+  const topSel = document.getElementById(topSelId);
+  if (topSel) topSel.addEventListener('change', function(){ chart._applyTop(this.value); });
+  const t = document.getElementById(toggleId);
+  if (t) t.addEventListener('change', function(){ chart.options.plugins.datalabels.display = this.checked; chart.update(); });
+}
+function bindPng(chart, btnId, file){
+  const b = document.getElementById(btnId);
+  if (b) b.addEventListener('click', ()=>{
+    const link = document.createElement('a');
+    link.href = chart.toBase64Image('image/png', 1.0);
+    link.download = file;
+    link.click();
+  });
+}
+
+// ---- Goles (goles + penales) ----
+(function(){
+  const el = document.getElementById('chart-goles');
+  const labels = JSON.parse(el.dataset.labels||'[]');
+  const g = JSON.parse(el.dataset.goles||'[]');
+  const p = JSON.parse(el.dataset.penales||'[]');
+  const ctx = el.getContext('2d');
+  const colors = ['rgba(13,110,253,0.7)','rgba(102,163,255,0.7)'];
+  const data = { labels, datasets:[
+    {label:'Goles', data:g, backgroundColor: colors[0], borderColor:'#0d6efd', borderWidth:1},
+    {label:'Goles de penal', data:p, backgroundColor: colors[1], borderColor:'#66a3ff', borderWidth:1}
+  ]};
+  const chart = new Chart(ctx, { type:'bar', data, options: mkStackedOptions() });
+  chart._applyTop = (val)=>{
+    const res = applyTop(labels, [g,p], val);
+    chart.data.labels = res.labels;
+    chart.data.datasets[0].data = res.series[0];
+    chart.data.datasets[1].data = res.series[1];
+    chart.update();
+  };
+  bindCommonControls(chart,'top-goles','toggle-goles');
+  bindPng(chart,'png-goles','estadisticas-goles.png');
+})();
+
+// ---- Tarjetas (amarillas + rojas) ----
+(function(){
+  const el = document.getElementById('chart-tarjetas');
+  const labels = JSON.parse(el.dataset.labels||'[]');
+  const a = JSON.parse(el.dataset.amarillas||'[]');
+  const r = JSON.parse(el.dataset.rojas||'[]');
+  const ctx = el.getContext('2d');
+  const data = { labels, datasets:[
+    {label:'Amarillas', data:a, backgroundColor:'rgba(255,193,7,0.8)', borderColor:'#ffc107', borderWidth:1},
+    {label:'Rojas', data:r, backgroundColor:'rgba(220,53,69,0.8)', borderColor:'#dc3545', borderWidth:1}
+  ]};
+  const chart = new Chart(ctx, { type:'bar', data, options: mkStackedOptions() });
+  chart._applyTop = (val)=>{
+    const res = applyTop(labels, [a,r], val);
+    chart.data.labels = res.labels;
+    chart.data.datasets[0].data = res.series[0];
+    chart.data.datasets[1].data = res.series[1];
+    chart.update();
+  };
+  bindCommonControls(chart,'top-tarjetas','toggle-tarjetas');
+  bindPng(chart,'png-tarjetas','estadisticas-tarjetas.png');
+})();
+
+// ---- Minutos ----
+(function(){
+  const el = document.getElementById('chart-minutos');
+  const labels = JSON.parse(el.dataset.labels||'[]');
+  const m = JSON.parse(el.dataset.minutos||'[]');
+  const ctx = el.getContext('2d');
+  const data = { labels, datasets:[
+    {label:'Minutos', data:m, backgroundColor:'rgba(11,172,43,0.7)', borderColor:'#0baa2b', borderWidth:1}
+  ]};
+  const chart = new Chart(ctx, { type:'bar', data, options: mkSingleOptions() });
+  chart._applyTop = (val)=>{
+    const res = applyTop(labels, [m], val);
+    chart.data.labels = res.labels;
+    chart.data.datasets[0].data = res.series[0];
+    chart.update();
+  };
+  bindCommonControls(chart,'top-minutos','toggle-minutos');
+  bindPng(chart,'png-minutos','estadisticas-minutos.png');
+})();
+</script>
+{% endblock %}
+{% endblock %}

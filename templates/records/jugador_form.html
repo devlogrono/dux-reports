@@ -1,6 +1,7 @@
 {% extends 'layouts/base.html' %}
 {% block title %}{{ 'Editar' if row else 'Nuevo' }} futbolista{% endblock %}
 {% block content %}
+{% set editing = (row is not none) %}
 <h2 class="fw-semibold mb-4 text-center">{{ 'Editar' if row else 'Nuevo' }} Futbolista</h2>
 <div class="card shadow-sm border border-secondary-subtle bg-light mx-auto" style="max-width:800px;">
   <div class="card-body">
@@ -9,43 +10,110 @@
         <label for="nombre" class="form-label">Nombre <span class="text-danger">*</span></label>
         <div class="input-group">
           <span class="input-group-text"><i class="bi bi-person"></i></span>
-          <input type="text" class="form-control" id="nombre" name="nombre" value="{{ row.nombre if row }}" required />
+          <input type="text" class="form-control" id="nombre" name="nombre"
+                value="{{ row.nombre if row }}" required />
           <div class="invalid-feedback">El nombre es obligatorio.</div>
         </div>
       </div>
+
       <div class="col-md-6">
         <label for="apellido" class="form-label">Apellido <span class="text-danger">*</span></label>
         <div class="input-group">
           <span class="input-group-text"><i class="bi bi-person"></i></span>
-          <input type="text" class="form-control" id="apellido" name="apellido" value="{{ row.apellido if row }}" required />
+          <input type="text" class="form-control" id="apellido" name="apellido"
+                value="{{ row.apellido if row }}" required />
           <div class="invalid-feedback">El apellido es obligatorio.</div>
         </div>
       </div>
+
       <div class="col-md-4">
-        <label for="sexo" class="form-label">Sexo</label>
-        <select id="sexo" name="sexo" class="form-select">
-          <option value="" {% if not row or not row.sexo %}selected{% endif %}>- Seleccionar -</option>
-          <option value="M" {% if row and row.sexo=='M' %}selected{% endif %}>Masculino</option>
-          <option value="F" {% if row and row.sexo=='F' %}selected{% endif %}>Femenino</option>
-          <option value="Otro" {% if row and row.sexo=='Otro' %}selected{% endif %}>Otro</option>
+        <label for="genero" class="form-label">Género</label>
+        <select id="genero" name="genero" class="form-select">
+          <option value="" {% if not row or not row.genero %}selected{% endif %}>- Seleccionar -</option>
+          <option value="M" {% if row and row.genero=='M' %}selected{% endif %}>Masculino</option>
+          <option value="F" {% if row and row.genero=='F' %}selected{% endif %}>Femenino</option>
         </select>
       </div>
+
+      {# Edad (en edición) o Fecha de nacimiento (en nuevo) #}
       <div class="col-md-4">
         <label for="fecha_nacimiento" class="form-label">Fecha de nacimiento</label>
-        <input type="date" class="form-control" id="fecha_nacimiento" name="fecha_nacimiento" value="{{ row.fecha_nacimiento.strftime('%Y-%m-%d') if row and row.fecha_nacimiento }}" />
+        <input type="date" class="form-control" id="fecha_nacimiento" name="fecha_nacimiento"
+               value="{{ row.fecha_nacimiento.strftime('%Y-%m-%d') if row and row.fecha_nacimiento }}" />
       </div>
+
       <div class="col-md-4">
         <label for="reconocimiento_medico" class="form-label">Reconocimiento médico</label>
-        <input type="date" class="form-control" id="reconocimiento_medico" name="reconocimiento_medico" value="{{ row.reconocimiento_medico.strftime('%Y-%m-%d') if row and row.reconocimiento_medico }}" />
+        <input type="date" class="form-control" id="reconocimiento_medico" name="reconocimiento_medico"
+               value="{{ row.reconocimiento_medico.strftime('%Y-%m-%d') if row and row.reconocimiento_medico }}" />
       </div>
+
       <div class="col-md-6">
-        <label for="estado" class="form-label">Estado</label>
-        <input type="text" class="form-control" id="estado" name="estado" value="{{ row.estado if row }}" />
+        <label for="id_estado" class="form-label">Estado</label>
+        <select id="id_estado" name="id_estado" class="form-select">
+          <option value="">- Seleccionar -</option>
+          {% for eid, ename in estados %}
+            <option value="{{ eid }}" {% if row and row.id_estado==eid %}selected{% endif %}>{{ ename }}</option>
+          {% endfor %}
+        </select>
       </div>
+
+      {% if row is not none and row.__class__.__dict__.get('competicion') or competiciones %}
       <div class="col-md-6">
-        <label class="form-label">ID</label>
-        <input type="text" class="form-control" value="{{ row.id if row }}" disabled />
+        <label for="competicion" class="form-label">Equipo</label>
+        <select id="competicion" name="competicion" class="form-select">
+          <option value="">- Seleccionar -</option>
+          {% for c in competiciones %}
+            <option value="{{ c.id }}" {% if row and row.competicion==c.id %}selected{% endif %}>{{ c.nombre }}</option>
+          {% endfor %}
+        </select>
+        {% if editing %}
+          <input type="hidden" name="competicion"
+                value="{{ row.competicion if row and row.__class__.__dict__.get('competicion') else '' }}">
+        {% endif %}
       </div>
+      {% endif %}
+
+      <!-- Nuevos campos editables -->
+      <div class="col-md-4">
+        <label for="dorsal" class="form-label">Dorsal</label>
+        <input type="number" class="form-control" id="dorsal" name="dorsal"
+               value="{{ info_row.dorsal if info_row and info_row.dorsal else '' }}" 
+               min="1" max="99" />
+      </div>
+
+      <div class="col-md-4">
+        <label for="posicion" class="form-label">Posición</label>
+        <select id="posicion" name="posicion" class="form-select">
+          <option value="" {% if not info_row or not info_row.posicion %}selected{% endif %}>- Seleccionar -</option>
+          <option value="POR" {% if info_row and info_row.posicion=='POR' %}selected{% endif %}>Portero (POR)</option>
+          <option value="DEF" {% if info_row and info_row.posicion=='DEF' %}selected{% endif %}>Defensa (DEF)</option>
+          <option value="MC" {% if info_row and info_row.posicion=='MC' %}selected{% endif %}>Centrocampista (MC)</option>
+          <option value="DEL" {% if info_row and info_row.posicion=='DEL' %}selected{% endif %}>Delantero (DEL)</option>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label for="nacionalidad" class="form-label">Nacionalidad</label>
+        <input type="text" class="form-control" id="nacionalidad" name="nacionalidad"
+               value="{{ nacionalidad_display if nacionalidad_display else '' }}" 
+               placeholder="Ej: España, Francia..." />
+      </div>
+
+      <div class="col-md-6">
+        <label for="altura" class="form-label">Altura (cm)</label>
+        <input type="number" class="form-control" id="altura" name="altura"
+               value="{{ info_row.altura if info_row and info_row.altura else '' }}" 
+               step="0.01" min="100" max="250" placeholder="Ej: 175" />
+      </div>
+
+      <div class="col-md-6">
+        <label for="peso" class="form-label">Peso (kg)</label>
+        <input type="number" class="form-control" id="peso" name="peso"
+               value="{{ info_row.peso if info_row and info_row.peso else '' }}" 
+               step="0.1" min="30" max="200" placeholder="Ej: 70" />
+      </div>
+
       <div class="col-12 text-center pt-3">
         <button type="submit" class="btn btn-primary me-2">Guardar</button>
         <a href="{{ url_for('jugadores.list') }}" class="btn btn-secondary">Cancelar</a>
@@ -53,10 +121,13 @@
     </form>
   </div>
 </div>
+
 <!-- Loading overlay -->
 <div id="jugadorFormLoading" class="position-fixed top-0 start-0 w-100 h-100 d-none justify-content-center align-items-center" style="background:rgba(255,255,255,.7);z-index:1050;">
   <img src="{{ url_for('static', filename='img/loader.gif') }}" alt="cargando...">
 </div>
+
+{% block extra_js %}
 <script>
   document.addEventListener('DOMContentLoaded', ()=>{
     const form=document.getElementById('jugadorForm');
@@ -75,4 +146,5 @@
     if(btnCancel){btnCancel.addEventListener('click', ()=>{ov.classList.remove('d-none');ov.classList.add('d-flex');});}
   });
 </script>
+{% endblock %}
 {% endblock %}

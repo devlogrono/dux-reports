@@ -1,0 +1,284 @@
+{% extends "layouts/base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>Dashboard Futbolistas</h1>
+
+    {# Tabs de navegación #}
+    {% set ns = namespace(qs=[]) %}
+    {% if equipo_seleccionado %}{% set ns.qs = ns.qs + ['equipo=' ~ equipo_seleccionado|urlencode] %}{% endif %}
+    {% if jornada_seleccionada %}{% set ns.qs = ns.qs + ['jornada=' ~ jornada_seleccionada] %}{% endif %}
+    {% if lv_seleccionado %}{% set ns.qs = ns.qs + ['lv=' ~ lv_seleccionado] %}{% endif %}
+    {% set qstr = '?' ~ ns.qs|join('&') if ns.qs else '' %}
+
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.index' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.index') }}">Participaciones</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.caracteristicas' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.caracteristicas') }}">Características</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.estadisticas' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.estadisticas') }}">Estadísticas</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.analisis_equipo' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.analisis_equipo') }}">Análisis equipo</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.sustituciones' %}active{% endif %}"
+               href="{{ url_for('dashboard_futbolistas.sustituciones') }}{{ qstr }}">Sustituciones</a>
+        </li>
+    </ul>
+
+    <h2 class="mb-4">Análisis de las sustituciones por equipo</h2>
+
+    {# Filtros #}
+    <form method="get" class="row g-3 align-items-end mb-4">
+        <div class="col-md-4">
+            <label class="form-label">Equipo</label>
+            <select name="equipo" class="form-select">
+                <option value="">(Todos)</option>
+                {% for e in equipos %}
+                    <option value="{{ e }}" {% if e == equipo_seleccionado %}selected{% endif %}>{{ e }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Jornada</label>
+            <select name="jornada" class="form-select">
+                <option value="">(Todas)</option>
+                {% for j in jornadas %}
+                    <option value="{{ j }}" {% if j == jornada_seleccionada %}selected{% endif %}>{{ j }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Local/Visitante</label>
+            <select name="lv" class="form-select">
+                <option value="">(Todos)</option>
+                <option value="L" {% if lv_seleccionado == 'L' %}selected{% endif %}>Local</option>
+                <option value="V" {% if lv_seleccionado == 'V' %}selected{% endif %}>Visitante</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-grid">
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+        </div>
+    </form>
+
+    <div class="row align-items-stretch">
+        {# Columna izquierda: KPIs de minutos #}
+        <div class="col-lg-3 mb-4 d-flex flex-column">
+            <div class="card mb-3 flex-fill">
+                <div class="card-body d-flex flex-column justify-content-center text-center">
+                    <div class="text-muted small mb-1">Minuto medio sustitución</div>
+                    <div class="display-6 text-success">{{ minuto_medio or '-' }}'</div>
+                </div>
+            </div>
+            <div class="card mb-3 flex-fill">
+                <div class="card-body d-flex flex-column justify-content-center text-center">
+                    <div class="text-muted small mb-1">Minuto medio primera sustitución</div>
+                    <div class="display-6 text-success">{{ minuto_medio_primera or '-' }}'</div>
+                </div>
+            </div>
+            <div class="card mb-3 flex-fill">
+                <div class="card-body d-flex flex-column justify-content-center text-center">
+                    <div class="text-muted small mb-1">Minuto medio última sustitución</div>
+                    <div class="display-6 text-success">{{ minuto_medio_ultima or '-' }}'</div>
+                </div>
+            </div>
+            <div class="card flex-fill">
+                <div class="card-body d-flex flex-column justify-content-center text-center">
+                    <div class="text-muted small mb-1">Número medio de sustituciones</div>
+                    <div class="display-6 text-danger">{{ num_medio_sustituciones or '-' }}</div>
+                </div>
+            </div>
+        </div>
+
+        {# Columna central: gráficos de barras #}
+        <div class="col-lg-6 mb-4 d-flex flex-column">
+            <div class="card mb-4 flex-fill">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title mb-3">Dispersión sustituciones por minuto</h5>
+                    <div class="flex-fill" style="height:260px;">
+                        <canvas id="chart-minutos"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="card flex-fill">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title mb-3">Número de cambios por jornada</h5>
+                    <div class="flex-fill" style="height:260px;">
+                        <canvas id="chart-jornadas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Columna derecha: rankings #}
+        <div class="col-lg-3 mb-4 d-flex flex-column">
+            <div class="card mb-3 flex-fill">
+                <div class="card-body d-flex flex-column justify-content-center text-center"">
+                    <h5 class="card-title">Top sustituciones más repetidas</h5>
+                    <ul class="mb-0 small">
+                        {% for row in top_parejas %}
+                            <li>{{ row.sale }} → {{ row.entra }} ({{ row.n }})</li>
+                        {% endfor %}
+                        {% if not top_parejas %}
+                            <li class="text-muted">Sin datos para los filtros seleccionados.</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card mb-3 flex-fill">
+                <div class="card-body d-flex flex-column justify-content-center text-center">
+                    <h5 class="card-title">Top jugadores sustituidos</h5>
+                    <ul class="mb-0 small">
+                        {% for row in top_sustituidos %}
+                            <li>{{ row.sale }} ({{ row.n }})</li>
+                        {% endfor %}
+                        {% if not top_sustituidos %}
+                            <li class="text-muted">Sin datos para los filtros seleccionados.</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card flex-fill">
+                <div class="card-body d-flex flex-column justify-content-center text-center">
+                    <h5 class="card-title">Top minutos desde el banquillo</h5>
+                    <ul class="mb-0 small">
+                        {% for row in top_banquillo %}
+                            <li>{{ row.jugador }} ({{ row.minutos }} min)</li>
+                        {% endfor %}
+                        {% if not top_banquillo %}
+                            <li class="text-muted">Sin datos para los filtros seleccionados.</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+<script>
+  if (window.ChartDataLabels) {
+    Chart.register(ChartDataLabels);
+  }
+
+  // Datos desde el backend
+  const distMinuto = {{ distribucion_minuto|tojson }};
+  const cambiosJornada = {{ cambios_por_jornada|tojson }};
+
+  const minutosLabels = distMinuto.map(d => d.minuto);
+  const minutosValues = distMinuto.map(d => d.n);
+
+  const jornadasLabels = cambiosJornada.map(d => d.jornada);
+  const jornadasValues = cambiosJornada.map(d => d.n);
+
+  function buildColors(values) {
+    if (!values.length) return [];
+    const max = Math.max(...values);
+    const min = Math.min(...values);
+    const range = (max - min) || 1;
+
+    return values.map(v => {
+      const t = (v - min) / range;  // 0..1
+      if (t < 0.33) return 'rgba(255, 206, 86, 0.8)';   // amarillo
+      if (t < 0.66) return 'rgba(255, 159, 64, 0.8)';   // naranja
+      return 'rgba(255, 99, 132, 0.8)';                 // rojo
+    });
+  }
+
+  function computeYMax(values) {
+    if (!values.length) return 1;
+    const max = Math.max(...values);
+    if (max === 0) return 1;
+    return Math.ceil(max * 1.2);   // 20% más alto que el máximo
+  }
+
+  const yMaxMinutos = computeYMax(minutosValues);
+  const yMaxJornadas = computeYMax(jornadasValues);
+
+  // Gráfico de minutos
+  const ctxMin = document.getElementById('chart-minutos').getContext('2d');
+  new Chart(ctxMin, {
+    type: 'bar',
+    data: {
+      labels: minutosLabels,
+      datasets: [{
+        label: 'Número de sustituciones',
+        data: minutosValues,
+        backgroundColor: buildColors(minutosValues),
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: yMaxMinutos,
+          ticks: { stepSize: 1 }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          anchor: 'end',
+          align: 'end',
+          offset: 2,
+          font: { size: 10 },
+          formatter: (value) => value
+        }
+      }
+    }
+  });
+
+  // Gráfico de jornadas
+  const ctxJor = document.getElementById('chart-jornadas').getContext('2d');
+  new Chart(ctxJor, {
+    type: 'bar',
+    data: {
+      labels: jornadasLabels,
+      datasets: [{
+        label: 'Número de sustituciones',
+        data: jornadasValues,
+        backgroundColor: buildColors(jornadasValues),
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: yMaxJornadas,
+          ticks: { stepSize: 1 }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          anchor: 'end',
+          align: 'end',
+          offset: 2,
+          font: { size: 10 },
+          formatter: (value) => value
+        }
+      }
+    }
+  });
+</script>
+{% endblock %}

@@ -1,8 +1,8 @@
 {% extends 'layouts/base.html' %}
-{% block title %}Estados de usuario{% endblock %}
+{% block title %}Estados de futbolistas{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h2 class="fw-semibold">Gestión de Estados de Usuarios</h2>
+  <h2 class="fw-semibold">Gestión de Estados de Futbolistas</h2>
   
   {% if can('create_state_user') %}
   <a href="{{ url_for('state_user.new') }}" id="btnNuevoUser" class="btn btn-success">Agregar nuevo</a>

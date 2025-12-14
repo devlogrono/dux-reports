@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/DUX_logr_fem_logo_1815C.png') }}">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}DUX{% endblock %}</title>
@@ -10,21 +10,47 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ui-elements.css') }}">
-    <style>body{padding-bottom:4rem;zoom:80%;}</style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+    <link rel="stylesheet" href="https://cdn.datatables.net/v/bs5/dt-2.0.7/datatables.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons/css/flag-icons.min.css">
     {% block extra_css %}{% endblock %}
 
     <style>
-        body{
-          background:url('{{ url_for('static', filename='img/fondo8.jpg') }}') no-repeat center center fixed;
-          background-size:cover;
-        }
-      </style>
+      body {
+          position: relative; /* necesario para el overlay */
+          background: url('{{ url_for('static', filename='img/fondo8.jpg') }}') no-repeat center center fixed;
+          background-size: cover;
+          z-index: 0; /* asegura que el contenido quede encima */
+      }
+
+      body::before {
+          content: "";
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0, 0, 0, 0.25); /* aclarado: menos contraste con texto negro */
+          pointer-events: none; /* no bloquea clicks */
+          z-index: 0;
+      }
+
+      /* Para que el contenido quede encima del overlay */
+      body > * {
+          position: relative;
+          z-index: 1;
+      }
+    </style>
 </head>
 <body class="d-flex flex-column min-vh-100">
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-custom shadow-sm">
         <div class="container-fluid">
-            <a class="navbar-brand" href="/">DUX</a>
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+              <img src="{{ url_for('static', filename='img/DUX_logr_fem_logo_1815C.png') }}" 
+                  alt="DUX Logo" 
+                  height="40">
+            </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -71,9 +97,11 @@
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="gestionesDropdown">
                          
-                          
+                          {% if can_mod('users') %}
+                            <li><a class="dropdown-item" href="{{ url_for('users.users_list') }}">Usuarios</a></li>
+                          {% endif %}
                             {% if can_mod('state_user') %}
-                            <li><a class="dropdown-item" href="{{ url_for('state_user.state_users_list') }}">Estados de usuario</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('state_user.state_users_list') }}">Estados de futbolistas</a></li>
                             {% endif %}
                             {% if can_mod('notifications') %}
                             <li><a class="dropdown-item" href="{{ url_for('notifications.list_all') }}">Notificaciones</a></li>
@@ -91,6 +119,8 @@
                             {% if can('view_dashboard_directive') %}
                             <li><a class="dropdown-item" href="{{ url_for('dashboard_directive.dashboard') }}">Dirección</a></li>
                             {% endif %}
+                            <li><a class="dropdown-item" href="{{ url_for('dashboard_actas.index') }}">Actas</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('dashboard_futbolistas.index') }}">Futbolistas</a></li>
                         </ul>
                     </li>
                 </ul>
@@ -136,13 +166,14 @@
   <img src="{{ url_for('static', filename='img/loader.gif') }}" alt="cargando...">
 </div>
 <!-- Footer -->
-    <footer class="footer fixed-bottom py-3 bg-light border-top">
+    <footer class="footer fixed-bottom py-3 bg-white border-top">
         <div class="container text-center">
             <span class="text-muted">DUX © 2025</span>
         </div>
     </footer>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.datatables.net/v/bs5/dt-2.0.7/datatables.min.js"></script>
     <script>
       // Intercept links or buttons with data-confirm attribute
       // Logout loading overlay
@@ -233,6 +264,8 @@
       <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-danger w-100">Cerrar sesión</a>
   </div>
 </div>
+
+{% block scripts %}{% endblock %}
 
 </body>
 </html>
