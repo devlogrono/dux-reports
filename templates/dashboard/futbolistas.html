@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="container-fluid py-4">
-    <h1>Dashboard Futbolistas</h1>
+    <h1>Participaciones</h1>
 
     {# Tabs locales para navegar entre dashboards, preservando filtros #}
     {% set ns = namespace(qs=[]) %}
@@ -51,14 +51,14 @@
                         </select>
                     </div>
 
-                    <!-- Filtro por Competición -->
+                    <!-- Filtro por Plantel -->
                     <div class="col-md-5">
-                        <label for="competicion">Seleccionar Competición</label>
+                        <label for="competicion">Seleccionar Plantel</label>
                         <select name="competicion" id="competicion" multiple class="form-select">
                             {% for c in competiciones %}
-                                <option value="{{ c }}"
-                                    {% if c in seleccionadas_competicion %} selected {% endif %}>
-                                    {{ c }}
+                                <option value="{{ c.codigo }}"
+                                    {% if c.codigo in seleccionadas_competicion %} selected {% endif %}>
+                                    {{ c.nombre }}
                                 </option>
                             {% endfor %}
                         </select>

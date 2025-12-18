@@ -2,13 +2,14 @@
 
 {% block content %}
 <div class="container-fluid py-4">
-    <h1>Dashboard Futbolistas</h1>
+    <h1>Sustituciones</h1>
 
     {# Tabs de navegación #}
     {% set ns = namespace(qs=[]) %}
     {% if equipo_seleccionado %}{% set ns.qs = ns.qs + ['equipo=' ~ equipo_seleccionado|urlencode] %}{% endif %}
     {% if jornada_seleccionada %}{% set ns.qs = ns.qs + ['jornada=' ~ jornada_seleccionada] %}{% endif %}
     {% if lv_seleccionado %}{% set ns.qs = ns.qs + ['lv=' ~ lv_seleccionado] %}{% endif %}
+    {% if plantel_seleccionado %}{% set ns.qs = ns.qs + ['plantel=' ~ plantel_seleccionado|urlencode] %}{% endif %}
     {% set qstr = '?' ~ ns.qs|join('&') if ns.qs else '' %}
 
     <ul class="nav nav-tabs mb-3">
@@ -37,37 +38,54 @@
     <h2 class="mb-4">Análisis de las sustituciones por equipo</h2>
 
     {# Filtros #}
-    <form method="get" class="row g-3 align-items-end mb-4">
-        <div class="col-md-4">
-            <label class="form-label">Equipo</label>
-            <select name="equipo" class="form-select">
-                <option value="">(Todos)</option>
-                {% for e in equipos %}
-                    <option value="{{ e }}" {% if e == equipo_seleccionado %}selected{% endif %}>{{ e }}</option>
-                {% endfor %}
-            </select>
+    <form method="get" id="filtros-form" class="mb-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-xl-10">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Equipo</label>
+                    <select name="equipo" class="form-select">
+                        <option value="">(Todos)</option>
+                        {% for e in equipos %}
+                            <option value="{{ e }}" {% if e == equipo_seleccionado %}selected{% endif %}>{{ e }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Plantel</label>
+                    <select name="plantel" class="form-select">
+                        <option value="">(Todos)</option>
+                        {% for p in planteles %}
+                            <option value="{{ p }}" {% if p == plantel_seleccionado %}selected{% endif %}>{{ p }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Jornada</label>
+                    <select name="jornada" class="form-select">
+                        <option value="">(Todas)</option>
+                        {% for j in jornadas %}
+                            <option value="{{ j }}" {% if j == jornada_seleccionada %}selected{% endif %}>{{ j }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Local/Visitante</label>
+                    <select name="lv" class="form-select">
+                        <option value="">(Todos)</option>
+                        <option value="L" {% if lv_seleccionado == 'L' %}selected{% endif %}>Local</option>
+                        <option value="V" {% if lv_seleccionado == 'V' %}selected{% endif %}>Visitante</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex justify-content-end gap-2">
+                    <button type="submit" class="btn btn-primary">Filtrar</button>
+                    <button type="button" id="btn-limpiar-filtros" class="btn btn-secondary">Limpiar filtros</button>
+                </div>
+            </div>
         </div>
-        <div class="col-md-3">
-            <label class="form-label">Jornada</label>
-            <select name="jornada" class="form-select">
-                <option value="">(Todas)</option>
-                {% for j in jornadas %}
-                    <option value="{{ j }}" {% if j == jornada_seleccionada %}selected{% endif %}>{{ j }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-3">
-            <label class="form-label">Local/Visitante</label>
-            <select name="lv" class="form-select">
-                <option value="">(Todos)</option>
-                <option value="L" {% if lv_seleccionado == 'L' %}selected{% endif %}>Local</option>
-                <option value="V" {% if lv_seleccionado == 'V' %}selected{% endif %}>Visitante</option>
-            </select>
-        </div>
-        <div class="col-md-2 d-grid">
-            <button type="submit" class="btn btn-primary">Filtrar</button>
-        </div>
-    </form>
+    </div>
+</form>
+
 
     <div class="row align-items-stretch">
         {# Columna izquierda: KPIs de minutos #}
@@ -280,5 +298,23 @@
       }
     }
   });
+
+  // Botón "Limpiar filtros"
+  const btnLimpiar = document.getElementById('btn-limpiar-filtros');
+  if (btnLimpiar) {
+    btnLimpiar.addEventListener('click', function () {
+      const form = document.getElementById('filtros-form');
+      if (!form) return;
+
+      ['equipo', 'plantel', 'jornada', 'lv'].forEach(name => {
+        const el = form.querySelector(`[name="${name}"]`);
+        if (el) {
+            el.value = '';
+        }
+      });
+
+      form.submit();
+    });
+  }
 </script>
 {% endblock %}

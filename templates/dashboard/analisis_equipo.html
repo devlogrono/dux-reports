@@ -31,9 +31,11 @@
         <div class="col-12 col-md-8">
           <label for="plantel">Seleccionar Plantel</label>
           <select multiple class="form-select" id="plantel" name="plantel">
-            {% for c in competiciones %}
-            <option value="{{ c }}" {% if c in seleccionadas_competicion %}selected{% endif %}>{{ c }}</option>
-            {% endfor %}
+          {% for c in competiciones %}
+            <option value="{{ c.codigo }}" {% if c.codigo in seleccionadas_competicion %}selected{% endif %}>
+              {{ c.nombre }}
+            </option>
+          {% endfor %}
           </select>
         </div>
         <div class="col-12 col-md-4 d-flex gap-2">

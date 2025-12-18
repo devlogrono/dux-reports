@@ -38,10 +38,24 @@ def index():
             'nombre_completo': f"{r['apellido']}, {r['nombre']}"
         })
 
-    # --- Obtener todas las competiciones para el filtro ---
-    sql_competiciones = "SELECT DISTINCT competicion FROM futbolistas"
-    result_competiciones = db.session.execute(text(sql_competiciones))
-    competiciones = [r[0] for r in result_competiciones]
+    # --- Opciones de planteles (competición -> nombre legible) ---
+    sql_competiciones = """
+        SELECT DISTINCT
+            f.competicion AS codigo,
+            d.nombre_competicion AS nombre
+        FROM futbolistas f
+        LEFT JOIN diccionario_competiciones d
+            ON f.competicion = d.id
+        WHERE f.competicion IS NOT NULL
+    """
+    rows_comp = db.session.execute(text(sql_competiciones)).mappings()
+    competiciones = [
+        {
+            "codigo": r["codigo"],
+            "nombre": r["nombre"] or r["codigo"],  # por si alguna competición no está en el diccionario
+        }
+        for r in rows_comp
+    ]
 
     # --- Consulta de partidos ---
     sql_partidos = """
@@ -114,10 +128,24 @@ def caracteristicas():
             'nombre_completo': f"{r['apellido']}, {r['nombre']}"
         })
 
-    # --- Obtener todas las competiciones para el filtro ---
-    sql_competiciones = "SELECT DISTINCT competicion FROM futbolistas"
-    result_comp = db.session.execute(text(sql_competiciones))
-    competiciones = [r[0] for r in result_comp]
+    # --- Opciones de planteles (competición -> nombre legible) ---
+    sql_competiciones = """
+        SELECT DISTINCT
+            f.competicion AS codigo,
+            d.nombre_competicion AS nombre
+        FROM futbolistas f
+        LEFT JOIN diccionario_competiciones d
+            ON f.competicion = d.id
+        WHERE f.competicion IS NOT NULL
+    """
+    rows_comp = db.session.execute(text(sql_competiciones)).mappings()
+    competiciones = [
+        {
+            "codigo": r["codigo"],
+            "nombre": r["nombre"] or r["codigo"],  # por si alguna competición no está en el diccionario
+        }
+        for r in rows_comp
+    ]
 
     # --- Distribución de futbolistas por competición (con filtros aplicados) ---
     sql_dist = """
@@ -249,10 +277,24 @@ def estadisticas():
             'nombre_completo': f"{r['apellido']}, {r['nombre']}"
         })
 
-    # --- Opciones de competiciones ---
-    sql_competiciones = "SELECT DISTINCT competicion FROM futbolistas"
-    result_comp = db.session.execute(text(sql_competiciones))
-    competiciones = [r[0] for r in result_comp]
+    # --- Opciones de planteles (competición -> nombre legible) ---
+    sql_competiciones = """
+        SELECT DISTINCT
+            f.competicion AS codigo,
+            d.nombre_competicion AS nombre
+        FROM futbolistas f
+        LEFT JOIN diccionario_competiciones d
+            ON f.competicion = d.id
+        WHERE f.competicion IS NOT NULL
+    """
+    rows_comp = db.session.execute(text(sql_competiciones)).mappings()
+    competiciones = [
+        {
+            "codigo": r["codigo"],
+            "nombre": r["nombre"] or r["codigo"],  # fallback a sigla si falta el nombre
+        }
+        for r in rows_comp
+    ]
 
     # --- Agregados por usuario desde actas ---
     sql_stats = """
@@ -306,10 +348,24 @@ def analisis_equipo():
     """Dashboard de análisis del equipo con único filtro de competición."""
     seleccionadas_competicion = request.args.getlist('plantel') or request.args.getlist('competicion')
 
-    # Opciones de competiciones para el filtro
-    sql_competiciones = "SELECT DISTINCT competicion FROM futbolistas"
-    result_comp = db.session.execute(text(sql_competiciones))
-    competiciones = [r[0] for r in result_comp]
+    # Opciones de planteles para el filtro (sigla -> nombre legible)
+    sql_competiciones = """
+        SELECT DISTINCT
+            f.competicion AS codigo,
+            d.nombre_competicion AS nombre
+        FROM futbolistas f
+        LEFT JOIN diccionario_competiciones d
+            ON f.competicion = d.id
+        WHERE f.competicion IS NOT NULL
+    """
+    rows_comp = db.session.execute(text(sql_competiciones)).mappings()
+    competiciones = [
+        {
+            "codigo": r["codigo"],
+            "nombre": r["nombre"] or r["codigo"],  # fallback a sigla si faltara el nombre
+        }
+        for r in rows_comp
+    ]
 
     # Series por jugador (desde actas)
     sql_stats = """
@@ -395,15 +451,33 @@ def sustituciones():
     equipo = request.args.get("equipo") or None
     jornada = request.args.get("jornada", type=int)
     lv = request.args.get("lv") or None   # 'L', 'V' o None
+    plantel = request.args.get("plantel") or None  # nombre_competicion
 
-    # --- Opciones para los filtros (equipos, jornadas) ---
-    sql_equipos = "SELECT DISTINCT equipo FROM sustituciones WHERE equipo IS NOT NULL ORDER BY equipo"
+    # --- Opciones para los filtros (equipos, jornadas, planteles) ---
+    sql_equipos = """
+        SELECT DISTINCT equipo
+        FROM sustituciones
+        WHERE equipo IS NOT NULL
+        ORDER BY equipo
+    """
     equipos = [r[0] for r in db.session.execute(text(sql_equipos))]
 
-    sql_jornadas = "SELECT DISTINCT jornada FROM jornadas WHERE jornada IS NOT NULL ORDER BY jornada"
+    sql_jornadas = """
+        SELECT DISTINCT jornada
+        FROM jornadas
+        WHERE jornada IS NOT NULL
+        ORDER BY jornada
+    """
     jornadas = [r[0] for r in db.session.execute(text(sql_jornadas))]
 
-    # --- Query base: sustituciones + jornada + condición local/visitante ---
+    sql_planteles = """
+        SELECT DISTINCT nombre_competicion
+        FROM diccionario_competiciones
+        ORDER BY nombre_competicion
+    """
+    planteles = [r[0] for r in db.session.execute(text(sql_planteles))]
+
+    # --- Query base: sustituciones + jornada + condición local/visitante + plantel ---
     sql_base = """
         SELECT
             s.acta_id,
@@ -416,7 +490,12 @@ def sustituciones():
                 WHEN s.equipo = cl.nombre_equipo THEN 'L'
                 WHEN s.equipo = cv.nombre_equipo THEN 'V'
                 ELSE NULL
-            END AS condicion_lv
+            END AS condicion_lv,
+            CASE
+                WHEN s.equipo = cl.nombre_equipo THEN dcl.nombre_competicion
+                WHEN s.equipo = cv.nombre_equipo THEN dcv.nombre_competicion
+                ELSE NULL
+            END AS plantel
         FROM sustituciones s
         LEFT JOIN jornadas j
             ON s.acta_id = j.acta_id
@@ -424,6 +503,10 @@ def sustituciones():
             ON j.id_equipo_local = cl.id_equipo
         LEFT JOIN competiciones cv
             ON j.id_equipo_visitante = cv.id_equipo
+        LEFT JOIN diccionario_competiciones dcl
+            ON cl.competicion = dcl.id
+        LEFT JOIN diccionario_competiciones dcv
+            ON cv.competicion = dcv.id
         WHERE 1 = 1
     """
     params = {}
@@ -445,6 +528,15 @@ def sustituciones():
         """
         params["lv"] = lv
 
+    if plantel:
+        sql_base += """
+            AND CASE
+                    WHEN s.equipo = cl.nombre_equipo THEN dcl.nombre_competicion
+                    WHEN s.equipo = cv.nombre_equipo THEN dcv.nombre_competicion
+                END = :plantel
+        """
+        params["plantel"] = plantel
+
     rows = db.session.execute(text(sql_base), params).mappings().all()
 
     # Si no hay datos, devolvemos algo vacío pero sin romper el template
@@ -452,9 +544,11 @@ def sustituciones():
         context = {
             "equipos": equipos,
             "jornadas": jornadas,
+            "planteles": planteles,
             "equipo_seleccionado": equipo,
             "jornada_seleccionada": jornada,
             "lv_seleccionado": lv,
+            "plantel_seleccionado": plantel,
             "minuto_medio": None,
             "minuto_medio_primera": None,
             "minuto_medio_ultima": None,
@@ -533,6 +627,10 @@ def sustituciones():
             ON j.id_equipo_local = cl.id_equipo
         LEFT JOIN competiciones cv
             ON j.id_equipo_visitante = cv.id_equipo
+        LEFT JOIN diccionario_competiciones dcl
+            ON cl.competicion = dcl.id
+        LEFT JOIN diccionario_competiciones dcv
+            ON cv.competicion = dcv.id
         WHERE a.titular = 0
     """
     params_b = {}
@@ -554,6 +652,15 @@ def sustituciones():
         """
         params_b["lv"] = lv
 
+    if plantel:
+        sql_banquillo += """
+            AND CASE
+                    WHEN a.equipo = cl.nombre_equipo THEN dcl.nombre_competicion
+                    WHEN a.equipo = cv.nombre_equipo THEN dcv.nombre_competicion
+                END = :plantel
+        """
+        params_b["plantel"] = plantel
+
     sql_banquillo += """
         GROUP BY a.jugador
         ORDER BY minutos_desde_banquillo DESC
@@ -569,9 +676,11 @@ def sustituciones():
     context = {
         "equipos": equipos,
         "jornadas": jornadas,
+        "planteles": planteles,
         "equipo_seleccionado": equipo,
         "jornada_seleccionada": jornada,
         "lv_seleccionado": lv,
+        "plantel_seleccionado": plantel,
         "minuto_medio": minuto_medio,
         "minuto_medio_primera": minuto_medio_primera,
         "minuto_medio_ultima": minuto_medio_ultima,
