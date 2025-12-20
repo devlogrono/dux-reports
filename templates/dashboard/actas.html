@@ -191,11 +191,11 @@
               {% if amar > 0 and roj == 0 %}
                 {% set barra_color = 'rgba(241,196,15,0.7)' %}
               {% elif amar == 0 and roj > 0 %}
-                {% set barra_color = 'rgba(220,53,69,0.65)' %}
+                {% set barra_color = '#DC3746' %}
               {% elif amar >= roj %}
                 {% set barra_color = 'rgba(241,196,15,0.7)' %}
               {% else %}
-                {% set barra_color = 'rgba(220,53,69,0.65)' %}
+                {% set barra_color = '#DC3746' %}
               {% endif %}
 
               {% if t.rojas %}
@@ -213,7 +213,7 @@
                       </span>
                     </div>
                   {% endif %}
-                  <div class="d-flex align-items-center" style="background-color: rgba(220,53,69,0.9); padding: 4px 10px;">
+                  <div class="d-flex align-items-center" style="background-color: #DC3746; padding: 4px 10px;">
                     <span class="fw-bold" style="color: #000;">
                       {{ t.rojas }}
                     </span>
