@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="container-fluid py-4">
-    <h1>Dashboard Futbolistas</h1>
+    <h1>Características</h1>
 
     {# Tabs locales para navegar entre dashboards, preservando filtros #}
     {% set ns = namespace(qs=[]) %}
@@ -27,7 +27,7 @@
         <li class="nav-item">
             <a class="nav-link {% if request.endpoint == 'dashboard_futbolistas.sustituciones' %}active{% endif %}"
                href="{{ url_for('dashboard_futbolistas.sustituciones') }}{{ qstr }}">Sustituciones</a>
-    </li>
+        </li>
     </ul>
 
     <!-- Filtros centrados y con ancho contenido -->
@@ -48,14 +48,14 @@
                         </select>
                     </div>
 
-                    <!-- Filtro por Competición -->
+                    <!-- Filtro por Plantel -->
                     <div class="col-md-5">
-                        <label for="competicion">Seleccionar Competición</label>
+                        <label for="competicion">Seleccionar Plantel</label>
                         <select name="competicion" id="competicion" multiple class="form-select">
                             {% for c in competiciones %}
-                                <option value="{{ c }}"
-                                    {% if c in seleccionadas_competicion %} selected {% endif %}>
-                                    {{ c }}
+                                <option value="{{ c.codigo }}"
+                                    {% if c.codigo in seleccionadas_competicion %} selected {% endif %}>
+                                    {{ c.nombre }}
                                 </option>
                             {% endfor %}
                         </select>
@@ -99,7 +99,6 @@
                 data-values='{{ dist_comp | map(attribute="cantidad") | list | tojson }}'></canvas>
         </div>
     </div>
-
     {% endif %}
 
     <!-- Edad por jugador -->
@@ -169,34 +168,71 @@ if (distEl) {
   const distLabels = JSON.parse(distEl.dataset.labels || '[]');
   const distValues = JSON.parse(distEl.dataset.values || '[]');
   const distCtx = distEl.getContext('2d');
+
   function buildDistData(labels, values) {
-    return { labels, datasets: [{ label: 'Futbolistas por competición', data: values,
-      backgroundColor: 'rgba(13, 110, 253, 0.7)', borderColor: '#0d6efd', borderWidth: 1 }] };
+    return {
+      labels,
+      datasets: [{
+        label: 'Futbolistas por competición',
+        data: values,
+        backgroundColor: 'rgba(13, 110, 253, 0.7)',
+        borderColor: '#0d6efd',
+        borderWidth: 1
+      }]
+    };
   }
+
   distChart = new Chart(distCtx, {
     type: 'bar',
     data: buildDistData(distLabels, distValues),
     options: {
-      responsive: true, maintainAspectRatio: false,
+      responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: { display: false, labels: { color: '#111' } },
-        tooltip: { callbacks: { title: (items)=> distLabels[items[0].dataIndex] } },
-        datalabels: { display: false, color: '#111', anchor: 'end', align: 'top', offset: 2, formatter: (v)=> v }
+        tooltip: {
+          callbacks: {
+            // Usamos el label actual del gráfico
+            title: (items) => items[0].label || ''
+          }
+        },
+        datalabels: {
+          display: false,
+          color: '#111',
+          anchor: 'end',
+          align: 'top',
+          offset: 2,
+          formatter: (v)=> v
+        }
       },
       interaction: { mode: 'index', intersect: false },
       layout: { padding: 16 },
       elements: { bar: { borderRadius: 4 } },
       scales: {
-        y: { beginAtZero: true, ticks: { color: '#222', stepSize: 1 }, grid: { color: '#e5e7eb', drawBorder: false } },
-        x: { ticks: { color: '#222', maxRotation: 45, autoSkip: true,
-            callback: (value, idx)=>{
-              const lbl = distLabels[idx] || ''; const maxLen=14; return lbl.length>maxLen? lbl.slice(0,maxLen)+'…' : lbl;
+        y: {
+          beginAtZero: true,
+          ticks: { color: '#222', stepSize: 1 },
+          grid: { color: '#e5e7eb', drawBorder: false }
+        },
+        x: {
+          ticks: {
+            color: '#222',
+            maxRotation: 45,
+            autoSkip: true,
+            callback: function (value, idx) {
+              const labels = (this.chart && this.chart.data && this.chart.data.labels) || [];
+              const lbl = labels[idx] || '';
+              const maxLen = 14;
+              return lbl.length > maxLen ? lbl.slice(0, maxLen) + '…' : lbl;
             }
-          }, grid: { color: '#e5e7eb', drawBorder: false } }
+          },
+          grid: { color: '#e5e7eb', drawBorder: false }
+        }
       },
       backgroundColor: '#fff'
     }
   });
+
   const btnPng = document.getElementById('btn-descargar-chart');
   if (btnPng) btnPng.addEventListener('click', ()=>{
     const link = document.createElement('a');
@@ -204,18 +240,23 @@ if (distEl) {
     link.download = 'dashboard-futbolistas-caracteristicas.png';
     link.click();
   });
+
   const selTop = document.getElementById('select-top');
   if (selTop) selTop.addEventListener('change', function(){
     const val = this.value;
     let idx = distLabels.map((_, i)=> i);
     idx.sort((a,b)=> distValues[b]-distValues[a]);
     let useIdx = idx;
-    if (val !== 'all') { const n = parseInt(val,10); useIdx = idx.slice(0,n); }
+    if (val !== 'all') {
+      const n = parseInt(val,10);
+      useIdx = idx.slice(0,n);
+    }
     const newLabels = useIdx.map(i=> distLabels[i]);
     const newValues = useIdx.map(i=> distValues[i]);
     distChart.data = buildDistData(newLabels, newValues);
     distChart.update();
   });
+
   const toggleDL = document.getElementById('toggle-datalabels');
   if (toggleDL) toggleDL.addEventListener('change', function(){
     distChart.options.plugins.datalabels.display = this.checked;
@@ -227,39 +268,85 @@ if (distEl) {
 const edadEl = document.getElementById('grafico-edad');
 const edadLabels = JSON.parse(edadEl.dataset.labels || '[]');
 const edadValuesRaw = JSON.parse(edadEl.dataset.values || '[]');
+
 // Filtrar out null/NaN, v en meses
 let edadPairs = edadLabels.map((l,i)=>({l, v: parseFloat(edadValuesRaw[i])})).filter(x=>!isNaN(x.v));
-function ym(meses){ const y=Math.floor(meses/12); const m=meses%12; return `${y} años y ${m} meses`; }
-function buildEdadData(pairs){
-  return { labels: pairs.map(x=>x.l), datasets: [{ label: 'Edad', data: pairs.map(x=>x.v),
-    backgroundColor: 'rgba(13, 110, 253, 0.7)', borderColor: '#0d6efd', borderWidth: 1 }] };
+
+function ym(meses){
+  const y = Math.floor(meses/12);
+  const m = meses % 12;
+  return `${y} años y ${m} meses`;
 }
+
+function buildEdadData(pairs){
+  return {
+    labels: pairs.map(x=>x.l),
+    datasets: [{
+      label: 'Edad',
+      data: pairs.map(x=>x.v),
+      backgroundColor: 'rgba(13, 110, 253, 0.7)',
+      borderColor: '#0d6efd',
+      borderWidth: 1
+    }]
+  };
+}
+
 let edadLabelsUse = edadPairs.map(x=>x.l);
 let edadValues = edadPairs.map(x=>x.v);
+
 let edadChart = new Chart(edadEl.getContext('2d'), {
   type: 'bar',
-  data: { labels: edadLabelsUse, datasets: [{
-    label: 'Edad', data: edadValues,
-    backgroundColor: 'rgba(13, 110, 253, 0.7)', borderColor: '#0d6efd', borderWidth: 1
-  }]},
+  data: {
+    labels: edadLabelsUse,
+    datasets: [{
+      label: 'Edad',
+      data: edadValues,
+      backgroundColor: 'rgba(13, 110, 253, 0.7)',
+      borderColor: '#0d6efd',
+      borderWidth: 1
+    }]
+  },
   options: {
-    responsive: true, maintainAspectRatio: false,
+    responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
-      datalabels: { display: false, color: '#111', anchor: 'end', align: 'top', offset: 2,
-        formatter: (value)=> ym(value) },
-      tooltip: { callbacks: { title: (items)=>edadLabelsUse[items[0].dataIndex],
-        label: (item)=> ym(item.parsed.y) } }
+      datalabels: {
+        display: false,
+        color: '#111',
+        anchor: 'end',
+        align: 'top',
+        offset: 2,
+        formatter: (value)=> ym(value)
+      },
+      tooltip: {
+        callbacks: {
+          title: (items) => items[0].label || '',
+          label: (item) => ym(item.parsed.y)
+        }
+      }
     },
     interaction: { mode: 'index', intersect: false },
     elements: { bar: { borderRadius: 4 } },
     scales: {
-      y: { beginAtZero: true, ticks: { color: '#222', stepSize: 12, callback: (v)=> ym(v) }, grid: { color: '#e5e7eb', drawBorder: false } },
-      x: { ticks: { color: '#222', maxRotation: 45, autoSkip: true }, grid: { color: '#e5e7eb', drawBorder: false } }
+      y: {
+        beginAtZero: true,
+        ticks: {
+          color: '#222',
+          stepSize: 12,
+          callback: (v)=> ym(v)
+        },
+        grid: { color: '#e5e7eb', drawBorder: false }
+      },
+      x: {
+        ticks: { color: '#222', maxRotation: 45, autoSkip: true },
+        grid: { color: '#e5e7eb', drawBorder: false }
+      }
     },
     backgroundColor: '#fff'
   }
 });
+
 // Ordenamiento edad
 const ordenEdadSel = document.getElementById('orden-edad');
 ordenEdadSel.addEventListener('change', ()=>{
@@ -278,20 +365,42 @@ const recEl = document.getElementById('grafico-recon');
 const recLabels = JSON.parse(recEl.dataset.labels || '[]');
 const recTsRaw = JSON.parse(recEl.dataset.ts || '[]');
 const recFechaRaw = JSON.parse(recEl.dataset.fechas || '[]');
-function fmtDMY(iso){ if(!iso) return '—'; const d=new Date(iso); if(isNaN(d)) return '—'; const dd=String(d.getDate()).padStart(2,'0'); const mm=String(d.getMonth()+1).padStart(2,'0'); const yy=d.getFullYear(); return `${dd}/${mm}/${yy}`; }
-function monthNameEs(m){ return ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][m] || ''; }
-let recPairs = recLabels.map((l,i)=>({l, ts: recTsRaw[i], f: recFechaRaw[i]})).filter(x=>x.ts!==null && x.ts!==undefined);
+
+function fmtDMY(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  if(isNaN(d)) return '—';
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const yy = d.getFullYear();
+  return `${dd}/${mm}/${yy}`;
+}
+
+function monthNameEs(m){
+  return ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][m] || '';
+}
+
+let recPairs = recLabels.map((l,i)=>({l, ts: recTsRaw[i], f: recFechaRaw[i]}))
+                        .filter(x=>x.ts!==null && x.ts!==undefined);
 let recLabelsUse = recPairs.map(x=>x.l);
 let recTs = recPairs.map(x=>x.ts);
 let recFechasUse = recPairs.map(x=>fmtDMY(x.f));
+
 let recChart = new Chart(recEl.getContext('2d'), {
   type: 'bar',
-  data: { labels: recLabelsUse, datasets: [{
-    label: 'Fecha de reconocimiento', data: recTs,
-    backgroundColor: 'rgba(25, 135, 84, 0.7)', borderColor: '#198754', borderWidth: 1
-  }]},
+  data: {
+    labels: recLabelsUse,
+    datasets: [{
+      label: 'Fecha de reconocimiento',
+      data: recTs,
+      backgroundColor: 'rgba(25, 135, 84, 0.7)',
+      borderColor: '#198754',
+      borderWidth: 1
+    }]
+  },
   options: {
-    responsive: true, maintainAspectRatio: false,
+    responsive: true,
+    maintainAspectRatio: false,
     indexAxis: 'y',
     plugins: {
       legend: { display: false },
@@ -335,31 +444,50 @@ let recChart = new Chart(recEl.getContext('2d'), {
 // Controles: filtro de año y orden
 const ordenReconSel = document.getElementById('orden-recon');
 const filtroAnioRecon = document.getElementById('filtro-anio-recon');
+
 function uniqueYears() {
   const years = new Set();
-  recPairs.forEach(p=>{ if(p.f){ const d=new Date(p.f); if(!isNaN(d)) years.add(d.getFullYear()); } });
+  recPairs.forEach(p=>{
+    if(p.f){
+      const d = new Date(p.f);
+      if(!isNaN(d)) years.add(d.getFullYear());
+    }
+  });
   return Array.from(years).sort((a,b)=>b-a);
 }
+
 function applyReconFilters() {
   const mode = ordenReconSel.value;
   const year = filtroAnioRecon.value;
-  let pairs = recLabels.map((l,i)=>({l, ts: recTsRaw[i], f: recFechaRaw[i]})).filter(x=>x.ts!==null && x.ts!==undefined);
+  let pairs = recLabels.map((l,i)=>({l, ts: recTsRaw[i], f: recFechaRaw[i]}))
+                       .filter(x=>x.ts!==null && x.ts!==undefined);
+
   if(year!=="all") {
-    pairs = pairs.filter(p=>{ const d=new Date(p.f); return !isNaN(d) && d.getFullYear().toString()===year; });
+    pairs = pairs.filter(p=>{
+      const d=new Date(p.f);
+      return !isNaN(d) && d.getFullYear().toString()===year;
+    });
   }
+
   if(mode==='date_desc') pairs.sort((a,b)=>b.ts-a.ts);
   else if(mode==='date_asc') pairs.sort((a,b)=>a.ts-b.ts);
   else if(mode==='name') pairs.sort((a,b)=>a.l.localeCompare(b.l,'es',{sensitivity:'base'}));
+
   recLabelsUse = pairs.map(x=>x.l);
   recTs = pairs.map(x=>x.ts);
   recFechasUse = pairs.map(x=>fmtDMY(x.f));
+
   recChart.data.labels = recLabelsUse;
   recChart.data.datasets[0].data = recTs;
   recChart.update();
 }
+
 // Inicializar años y listeners
 const years = uniqueYears();
-filtroAnioRecon.innerHTML = `<option value="all" selected>Todos</option>` + years.map(y=>`<option value="${y}">${y}</option>`).join('');
+filtroAnioRecon.innerHTML =
+  `<option value="all" selected>Todos</option>` +
+  years.map(y=>`<option value="${y}">${y}</option>`).join('');
+
 ordenReconSel.addEventListener('change', applyReconFilters);
 filtroAnioRecon.addEventListener('change', applyReconFilters);
 </script>
