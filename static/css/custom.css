@@ -102,6 +102,14 @@ h1, h2, h3 {
   background-color: #198754;  /* verde */
   color: #fff;
 }
+.estado-badge.cesión {
+  background-color: #ffc107;  /* amarillo */
+  color: #111;
+}
+.estado-badge.inactivo {
+  background-color: #dc3545;  /* rojo */
+  color: #fff;
+}
 .estado-badge.pte-actualizacion {
   background-color: #a86500;  /* naranja oscuro */
   color: #fff;

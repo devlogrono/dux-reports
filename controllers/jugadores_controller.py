@@ -54,6 +54,18 @@ def _to_date(v) -> date | None:
     return None
 
 
+COMPETICION_ORDER = {
+    "1FF": 1,
+    "3FFF": 2,
+    "1J": 3,
+    "1C": 4,
+    "2C": 5,
+    "CFF": 6,
+    "1I": 7,
+    "IFF": 8,
+}
+
+
 # LISTA
 @jugadores_bp.get("/")
 @login_required
@@ -189,6 +201,8 @@ def list():  # type: ignore[override]
             .all()
         )
         competiciones = [{"id": r[0], "nombre": r[1]} for r in rows_comp]
+        competiciones.sort(key=lambda c: COMPETICION_ORDER.get(c["id"], 999))
+        competiciones.sort(key=lambda c: COMPETICION_ORDER.get(c["id"], 999))
 
     # Verificar si al menos un jugador tiene cada campo
     mostrar_nacionalidad = any(r["nacionalidad"] for r in rows)
@@ -272,14 +286,7 @@ def _form(row_id: str | None = None):
     estados = []
     if S:
         rows = db.session.query(S.id, S.name).order_by(S.name.asc()).all()
-        allowed = []
-        for r in rows:
-            name_norm = (r.name or "").strip().upper()
-            if name_norm == "ACTIVO":
-                allowed.append((r.id, "ACTIVO"))
-            elif name_norm in ("CESION", "CESIÓN"):
-                allowed.append((r.id, "CESIÓN"))
-        estados = allowed
+        estados = [(r.id, r.name) for r in rows]
 
     row = db.session.get(F, row_id) if row_id else None
     info_row = None
