@@ -6,6 +6,7 @@
 <div class="card shadow-sm border border-secondary-subtle bg-light mx-auto" style="max-width:800px;">
   <div class="card-body">
     <form id="jugadorForm" method="post" class="row g-3 needs-validation" novalidate>
+      <input type="hidden" id="row_id" name="row_id" value="{{ row.id if row else '' }}">
       <div class="col-md-6">
         <label for="nombre" class="form-label">Nombre <span class="text-danger">*</span></label>
         <div class="input-group">
@@ -23,6 +24,16 @@
           <input type="text" class="form-control" id="apellido" name="apellido"
                 value="{{ row.apellido if row }}" required />
           <div class="invalid-feedback">El apellido es obligatorio.</div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <label for="identificacion" class="form-label">DNI/Pasaporte <span class="text-danger">*</span></label>
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-card-text"></i></span>
+          <input type="text" class="form-control" id="identificacion" name="identificacion"
+                 value="{{ row.identificacion if row and row.__class__.__dict__.get('identificacion') else '' }}" required />
+          <div class="invalid-feedback">El DNI/Pasaporte es obligatorio.</div>
         </div>
       </div>
 
@@ -129,21 +140,106 @@
 
 {% block extra_js %}
 <script>
-  document.addEventListener('DOMContentLoaded', ()=>{
-    const form=document.getElementById('jugadorForm');
-    const ov=document.getElementById('jugadorFormLoading');
-    if(form){
-      form.addEventListener('submit', e=>{
-        if(!form.checkValidity()){
-          e.preventDefault();e.stopPropagation();
-        }else{
-          ov.classList.remove('d-none');ov.classList.add('d-flex');
-        }
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('jugadorForm');
+    const ov   = document.getElementById('jugadorFormLoading');
+    if (!form) return;
+
+    const editing = {{ 'true' if editing else 'false' }};
+    let skipDuplicateCheck = false;
+
+    form.addEventListener('submit', (event) => {
+      // Validación HTML5 siempre
+      if (!form.checkValidity()) {
+        event.preventDefault();
+        event.stopPropagation();
         form.classList.add('was-validated');
+        return;
+      }
+      form.classList.add('was-validated');
+
+      // En edición o en el segundo envío (tras confirmar), sólo mostramos overlay y dejamos enviar
+      if (editing || skipDuplicateCheck) {
+        if (ov) {
+          ov.classList.remove('d-none');
+          ov.classList.add('d-flex');
+        }
+        return;
+      }
+
+      // Alta: primer intento, comprobamos duplicados vía AJAX
+      event.preventDefault();
+
+      const formData = new FormData(form);
+
+      fetch("{{ url_for('jugadores.check_duplicado') }}", {
+        method: 'POST',
+        body: formData
+      })
+        .then(response => response.ok ? response.json() : null)
+        .then(data => {
+          if (!data || (!data.exists_nombre_apellido && !data.exists_identificacion)) {
+            skipDuplicateCheck = true;
+            form.submit();
+            return;
+          }
+
+          const mensajes = [];
+
+          if (data.exists_nombre_apellido) {
+            if (data.identificacion_existente) {
+              mensajes.push(`Ese registro ya existe con DNI/pasaporte ${data.identificacion_existente}.`);
+            } else {
+              mensajes.push('Ya existe un futbolista con el mismo nombre y apellido.');
+            }
+          }
+
+          if (data.exists_identificacion) {
+            if (data.nombre_existente) {
+              mensajes.push(`Ya existe un futbolista con este DNI/pasaporte (${data.nombre_existente}).`);
+            } else {
+              mensajes.push('Ya existe un futbolista con este DNI/pasaporte.');
+            }
+          }
+
+          const texto = mensajes.join(' ');
+
+          const continuar = (resolver) => {
+            if (resolver) {
+              skipDuplicateCheck = true;
+              form.submit();
+            }
+          };
+
+          if (window.Swal) {
+            Swal.fire({
+              title: 'Posible duplicado',
+              text: texto + ' ¿Está seguro de que quiere continuar?',
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonText: 'Sí, continuar',
+              cancelButtonText: 'Cancelar'
+            }).then(result => {
+              continuar(result.isConfirmed);
+            });
+          } else {
+            const ok = confirm(texto + ' ¿Está seguro de que quiere continuar?');
+            continuar(ok);
+          }
+        })
+        .catch(() => {
+          skipDuplicateCheck = true;
+          form.submit();
+        });
+    });
+
+    const btnCancel = document.querySelector('#jugadorForm a.btn-secondary');
+    if (btnCancel && ov) {
+      btnCancel.addEventListener('click', () => {
+        ov.classList.remove('d-none');
+        ov.classList.add('d-flex');
       });
     }
-    const btnCancel=document.querySelector('#jugadorForm a.btn-secondary');
-    if(btnCancel){btnCancel.addEventListener('click', ()=>{ov.classList.remove('d-none');ov.classList.add('d-flex');});}
   });
 </script>
 {% endblock %}

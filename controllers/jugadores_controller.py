@@ -3,9 +3,10 @@ Campos: id (PK, varchar), nombre, apellido, sexo, fecha_nacimiento (date), recon
 """
 import math
 import uuid
+import unicodedata
 from datetime import date, datetime
 from difflib import get_close_matches
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_, case
@@ -52,6 +53,15 @@ def _to_date(v) -> date | None:
         except Exception:
             return None
     return None
+
+
+def _normalizar_texto_simple(s: str | None) -> str:
+    """Normaliza texto a minúsculas sin tildes ni signos diacríticos."""
+    if not s:
+        return ""
+    s = s.strip().lower()
+    nfkd = unicodedata.normalize("NFKD", s)
+    return "".join(c for c in nfkd if not unicodedata.category(c).startswith("M"))
 
 
 COMPETICION_ORDER = {
@@ -126,6 +136,10 @@ def list():  # type: ignore[override]
             F.genero.ilike(like),
             S.name.ilike(like),
         ]
+        if hasattr(F, "identificacion"):
+            filtros.append(getattr(F, "identificacion").ilike(like))
+        if I is not None and hasattr(I, "identificacion"):
+            filtros.append(getattr(I, "identificacion").ilike(like))
         query = query.filter(or_(*filtros))
 
     if competicion and hasattr(F, "competicion"):
@@ -306,6 +320,7 @@ def _form(row_id: str | None = None):
         fecha_nacimiento = _parse_date(request.form.get("fecha_nacimiento"))
         reconocimiento_medico = _parse_date(request.form.get("reconocimiento_medico"))
         competicion_val = (request.form.get("competicion") or "").strip() if hasattr(F, "competicion") else None
+        identificacion_val = (request.form.get("identificacion") or "").strip()
         
         # Nuevos campos de informacion_futbolistas
         dorsal_val = request.form.get("dorsal", "").strip()
@@ -313,6 +328,8 @@ def _form(row_id: str | None = None):
         nacionalidad_input = request.form.get("nacionalidad", "").strip()
         altura_val = request.form.get("altura", "").strip()
         peso_val = request.form.get("peso", "").strip()
+
+        old_identificacion = getattr(row, "identificacion", None) if row and hasattr(row, "identificacion") else None
         
         # Procesar nacionalidad con fuzzy matching
         nacionalidad_iso = None
@@ -324,8 +341,12 @@ def _form(row_id: str | None = None):
             else:
                 nacionalidad_iso = nacionalidad_input.upper()[:2]  # Fallback: primeras 2 letras en mayúscula
 
-        if not nombre or not apellido:
-            flash("Nombre y Apellido son obligatorios", "warning")
+        require_ident = hasattr(F, "identificacion")
+        if not nombre or not apellido or (require_ident and not identificacion_val):
+            if require_ident:
+                flash("Nombre, Apellido y DNI/Pasaporte son obligatorios", "warning")
+            else:
+                flash("Nombre y Apellido son obligatorios", "warning")
         else:
             try:
                 if not row:
@@ -336,9 +357,13 @@ def _form(row_id: str | None = None):
                 row.nombre = nombre
                 row.apellido = apellido
                 row.genero = genero_val or None
-                # Generar identificacion si la columna existe y está vacía
-                if hasattr(row, "identificacion") and not getattr(row, "identificacion", None):
-                    row.identificacion = str(uuid.uuid4())
+                # Asignar/editar identificacion (DNI/pasaporte) si la columna existe
+                if hasattr(row, "identificacion"):
+                    if identificacion_val:
+                        row.identificacion = identificacion_val
+                    elif not getattr(row, "identificacion", None):
+                        # Generar identificacion si sigue vacía (fallback UUID)
+                        row.identificacion = str(uuid.uuid4())
                 row.id_estado = int(id_estado) if id_estado else None
                 row.fecha_nacimiento = fecha_nacimiento
                 row.reconocimiento_medico = reconocimiento_medico
@@ -357,6 +382,12 @@ def _form(row_id: str | None = None):
                         if hasattr(I, "identificacion") and hasattr(row, "identificacion"):
                             setattr(info_row, "identificacion", row.identificacion)
                         db.session.add(info_row)
+
+                    # Si ya existe info_row y ha cambiado la identificacion, propagar el cambio
+                    if info_row and hasattr(I, "identificacion") and hasattr(row, "identificacion"):
+                        nueva_identificacion = getattr(row, "identificacion", None)
+                        if nueva_identificacion and nueva_identificacion != old_identificacion:
+                            setattr(info_row, "identificacion", nueva_identificacion)
                     
                     # Actualizar campos
                     if hasattr(I, "dorsal"):
@@ -446,6 +477,65 @@ def new():
 @require_perm("update_jugador")
 def edit(row_id: str):
     return _form(row_id)
+
+
+@jugadores_bp.post("/check-duplicado")
+@login_required
+@require_perm("create_jugador")
+def check_duplicado():
+    F = _model("futbolistas")
+    if not F:
+        return jsonify({"error": "Modelo futbolistas no disponible"}), 500
+
+    nombre = (request.form.get("nombre") or "").strip()
+    apellido = (request.form.get("apellido") or "").strip()
+    identificacion_val = (request.form.get("identificacion") or "").strip()
+
+    exists_nombre_apellido = False
+    exists_identificacion = False
+    identificacion_existente = None
+    nombre_existente = None
+
+    if nombre and apellido:
+        norm_nombre = _normalizar_texto_simple(nombre)
+        norm_apellido = _normalizar_texto_simple(apellido)
+
+        existing = None
+        candidatos = (
+            db.session.query(F)
+            .filter(F.nombre.isnot(None), F.apellido.isnot(None))
+            .all()
+        )
+        for c in candidatos:
+            if (
+                _normalizar_texto_simple(getattr(c, "nombre", "")) == norm_nombre
+                and _normalizar_texto_simple(getattr(c, "apellido", "")) == norm_apellido
+            ):
+                existing = c
+                break
+
+        if existing:
+            exists_nombre_apellido = True
+            identificacion_existente = getattr(existing, "identificacion", None)
+
+    if identificacion_val and hasattr(F, "identificacion"):
+        existing2 = (
+            db.session.query(F)
+            .filter(getattr(F, "identificacion") == identificacion_val)
+            .first()
+        )
+        if existing2:
+            exists_identificacion = True
+            nombre_existente = f"{getattr(existing2, 'nombre', '')} {getattr(existing2, 'apellido', '')}".strip()
+
+    return jsonify(
+        {
+            "exists_nombre_apellido": exists_nombre_apellido,
+            "exists_identificacion": exists_identificacion,
+            "identificacion_existente": identificacion_existente,
+            "nombre_existente": nombre_existente,
+        }
+    )
 
 
 @jugadores_bp.post("/<string:row_id>/delete")
