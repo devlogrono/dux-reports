@@ -19,5 +19,5 @@ updates:
       - "devlogrono"
 
     ignore:
-      - dependency-name: "streamlit"
-        versions: ["2.x"]  
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]  
