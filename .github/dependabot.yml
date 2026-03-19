@@ -1,0 +1,23 @@
+version: 2
+
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"   # donde está tu requirements.txt
+    schedule:
+      interval: "weekly"
+
+    open-pull-requests-limit: 5
+
+    commit-message:
+      prefix: "deps"
+
+    labels:
+      - "dependencies"
+      - "security"
+
+    reviewers:
+      - "TU_USUARIO_GITHUB"
+
+    ignore:
+      - dependency-name: "streamlit"
+        versions: ["2.x"]  # opcional si quieres controlar upgrades grandes
