@@ -16,8 +16,8 @@ updates:
       - "security"
 
     reviewers:
-      - "TU_USUARIO_GITHUB"
+      - "devlogrono"
 
     ignore:
       - dependency-name: "streamlit"
-        versions: ["2.x"]  # opcional si quieres controlar upgrades grandes
+        versions: ["2.x"]  
