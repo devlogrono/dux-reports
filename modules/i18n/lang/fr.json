@@ -1,0 +1,445 @@
+{
+  "Todos": "Tous",
+  "Registrar ausencia": "Enregistrer une absence",
+  "Selecciona un motivo de ausencia para continuar.": "Sélectionnez une raison d’absence pour continuer.",
+  "La fecha final no puede ser menor que la fecha inicial.": "La date de fin ne peut pas être antérieure à la date de début.",
+  "Rehabilitación/readaptación" : "Rehabilitation/Readaptation",
+  "Ausente": "Absent",
+  "Inicio": "Accueil",
+  "Registro": "Enregistrement",
+  "Registros": "Enregistrements",
+  "Individual": "Individuel",
+  "Grupal": "Groupe",
+  "Hoy": "Aujourd’hui",
+  "Último día": "Dernier jour",
+  "Semana": "Semaine",
+  "Mes": "Mois",
+  "el día de hoy": "aujourd’hui",
+  "el último día": "le dernier jour",
+  "la última semana": "la dernière semaine",
+  "el último mes": "le dernier mois",
+  "Métrica": "Métrique",
+  "Índice de Bienestar Promedio": "Indice moyen de bien-être",
+  "Valor": "Valeur",
+  "Interpretación": "Interprétation",
+  "RPE Promedio": "RPE moyen",
+  "Carga Total (UA)": "Charge totale (UA)",
+  "Recuperación": "Récupération",
+  "Energía": "Énergie",
+  "Sueño": "Sommeil",
+  "Estrés": "Stress",
+  "Dolor": "Douleur",
+  "Promedio template": "Moyenne de bien-être",
+  "UA total": "UA totale",
+  "En riesgo": "À risque",
+  "Registros/Días": "Enregistrements/Jours",
+
+  "🟢 Óptimo (>20): El grupo mantiene un estado físico y mental adecuado. ":
+  "🟢 Optimal (>20) : Le groupe maintient un état physique et mental adéquat. ",
+
+  "🟡 Moderado (15-19): Existen signos leves de fatiga o estrés. ":
+  "🟡 Modéré (15-19) : Quelques signes légers de fatigue ou de stress. ",
+
+  "🔴 Alerta (<15): El grupo muestra fatiga o malestar significativo. ":
+  "🔴 Alerte (<15) : Le groupe présente une fatigue ou un malaise significatif. ",
+
+  "🟢 Controlado (<6): El esfuerzo percibido está dentro de los rangos esperados. ":
+  "🟢 Contrôlé (<6) : L’effort perçu reste dans les limites attendues. ",
+
+  "🟡 Medio (6-7): Carga elevada, pero dentro de niveles aceptables. ":
+  "🟡 Moyen (6-7) : Charge élevée, mais dans des niveaux acceptables. ",
+
+  "🔴 Alto (>7): Percepción de esfuerzo muy alta. ":
+  "🔴 Élevé (>7) : Perception d’effort très élevée. ",
+
+  "🟢 Estable: La carga total se mantiene dentro de los márgenes planificados. ":
+  "🟢 Stable : La charge totale reste dans les marges prévues. ",
+
+  "🟡 Variación moderada (10-20%): Ajustes leves de carga detectados. ":
+  "🟡 Variation modérée (10-20%) : Légers ajustements de charge détectés. ",
+
+  "🔴 Variación fuerte (>20%): Aumento o descenso brusco de la carga. ":
+  "🔴 Variation forte (>20%) : Augmentation ou diminution brusque de la charge. ",
+
+  "🟢 Grupo estable: Ninguna jugadora muestra indicadores de riesgo. ":
+  "🟢 Groupe stable : Aucune joueuse ne montre d’indicateurs de risque. ",
+
+  "🟡 Seguimiento leve (<15%): Algunas jugadoras presentan fatiga o molestias leves. ":
+  "🟡 Suivi léger (<15%) : Certaines joueuses présentent une fatigue ou un léger inconfort. ",
+
+  "🔴 Riesgo elevado (>15%): Varios casos de fatiga o dolor detectados. ":
+  "🔴 Risque élevé (>15%) : Plusieurs cas de fatigue ou de douleur détectés. ",
+
+  ":material/description: Registros detallados": ":material/description: Enregistrements détaillés",
+  ":material/report_problem: Pendientes de registro": ":material/report_problem: Enregistrements en attente",
+  ":material/login: **Sin Check-In**": ":material/login: **Sans Check-In**",
+  ":material/logout: **Sin Check-Out**": ":material/logout: **Sans Check-Out**",
+
+  "### **Gráficos individuales**": "### **Graphiques individuels**",
+  "### **Resumen de carga individual**": "### **Résumé de charge individuelle**",
+  "### Resumen de generación": "### Résumé de génération",
+  "#### **Check-out (post-entrenamiento)**": "#### **Check-out (post-entraînement)**",
+  "#### Evolución de RPE y Carga Interna (UA)": "#### Évolution du RPE et de la charge interne (UA)",
+  "#### Evolución del índice ACWR (Relación Agudo:Crónico)": "#### Évolution de l’indice ACWR (Ratio Aigu:Chronique)",
+  "#### Relación entre duración y esfuerzo percibido": "#### Relation entre durée et effort perçu",
+  "#### Evolución del riesgo de lesión (ACWR + Fatiga)": "#### Évolution du risque de blessure (ACWR + Fatigue)",
+
+  "**Archivo destino:**": "**Fichier de destination :**",
+  "**Check-in diario (pre-entrenamiento)**": "**Check-in quotidien (pré-entraînement)**",
+
+  "**Dolor** :green[:material/arrow_downward_alt:] (:green[**1**] - :red[**5**])":
+  "**Douleur** :green[:material/arrow_downward_alt:] (:green[**1**] - :red[**5**])",
+
+  "**Energía** :green[:material/arrow_upward_alt:] (:red[**1**] - :green[**5**])":
+  "**Énergie** :green[:material/arrow_upward_alt:] (:red[**1**] - :green[**5**])",
+
+  "**Estrés** :green[:material/arrow_downward_alt:] (:green[**1**] - :red[**5**])":
+  "**Stress** :green[:material/arrow_downward_alt:] (:green[**1**] - :red[**5**])",
+
+  "**Evolución de los indicadores de bienestar (1-5)**":
+  "**Évolution des indicateurs de bien-être (1-5)**",
+
+  "Interpretación de las métricas": "Interprétation des métriques",
+  "**Interpretación:**": "**Interprétation :**",
+
+  "**Jugadora:** {jug} | **Fecha:** {fecha} | **Turno:** {turno} | **Tipo:** {tipo}":
+  "**Joueuse :** {jug} | **Date :** {fecha} | **Tour :** {turno} | **Type :** {tipo}",
+
+  "**Periodización táctica**": "**Périodisation tactique**",
+
+  "**Recuperación** :green[:material/arrow_upward_alt:] (:red[**1**] - :green[**5**])":
+  "**Récupération** :green[:material/arrow_upward_alt:] (:red[**1**] - :green[**5**])",
+
+  "**Registros del periodo seleccionado**": "**Enregistrements pour la période sélectionnée**",
+  "**Riesgo actual:**": "**Risque actuel :**",
+
+  "**Sueño** :green[:material/arrow_upward_alt:] (:red[**1**] - :green[**5**])":
+  "**Sommeil** :green[:material/arrow_upward_alt:] (:red[**1**] - :green[**5**])",
+
+  "**template por sesión**": "**Bien-être par séance**",
+
+  "ACWR": "ACWR",
+  "Adaptación": "Adaptation",
+  "Administración :material/settings:": "Administration :material/settings:",
+  "Administrador de :red[registros]": "Administrateur des :red[enregistrements]",
+  "Análisis :red[grupal]": "Analyse :red[de groupe]",
+  "Análisis :red[individual]": "Analyse :red[individuelle]",
+  "Análisis y Estadísticas :material/query_stats:": "Analyse et Statistiques :material/query_stats:",
+
+  "Backup guardado en: `{result[": "Sauvegarde enregistrée dans : `{result[`",
+
+  "Bienestar promedio del grupo": "Bien-être moyen du groupe",
+  "Carga interna total (UA)": "Charge interne totale (UA)",
+  "Carga media mes": "Charge mensuelle moyenne",
+  "Carga media semana": "Charge hebdomadaire moyenne",
+  "Carga mes": "Charge mensuelle",
+  "Carga semana": "Charge hebdomadaire",
+
+  "Cerrar Sesión": "Se déconnecter",
+  "Contraseña": "Mot de passe",
+
+  "Día de la sesión": "Jour de la séance",
+
+  "El DataFrame no contiene la columna": "Le DataFrame ne contient pas la colonne",
+  "Esfuerzo percibido promedio (RPE)": "Effort perçu moyen (RPE)",
+
+  "Esta información ayuda a gestionar las cargas con respecto a la fisiología femenina":
+  "Ces informations aident à gérer les charges en fonction de la physiologie féminine",
+
+  "Fatiga aguda (7d)": "Fatigue aiguë (7j)",
+  "Fatiga crónica (28d)": "Fatigue chronique (28j)",
+
+  "Generar registros aleatorios": "Générer des enregistrements aléatoires",
+  "Guardar": "Enregistrer",
+  "Hola": "Bonjour",
+  "Jugadora": "Joueuse",
+  "Jugadoras en Zona Roja": "Joueuses en zone rouge",
+
+  "MD+": "MD+",
+  "MD-": "MD-",
+
+  "Minutos de la sesión": "Minutes de la séance",
+  "Minutos último día": "Minutes du dernier jour",
+
+  "Modo :material/dashboard:": "Mode :material/dashboard:",
+  "Monotonía semana": "Monotonie hebdomadaire",
+
+  "No existe un registro de check-in previo para esta jugadora, fecha y turno.":
+  "Aucun enregistrement de check-in préalable trouvé pour cette joueuse, cette date et ce tour.",
+
+  "No hay datos de RPE o UA para graficar.": "Pas de données RPE ou UA à afficher.",
+  "No hay datos de bienestar para graficar.": "Pas de données de bien-être à afficher.",
+  "No hay datos de carga disponibles.": "Pas de données de charge disponibles.",
+  "No hay datos de carga interna (UA) para calcular ACWR.": "Pas de charge interne (UA) disponible pour calculer l’ACWR.",
+  "No hay datos de minutos o RPE para graficar.": "Pas de minutes ou RPE disponibles pour afficher.",
+  "No hay datos disponibles para el periodo seleccionado.": "Aucune donnée disponible pour la période sélectionnée.",
+  "No hay datos disponibles para graficar.": "Aucune donnée disponible à afficher.",
+  "No hay datos suficientes para calcular el riesgo.": "Données insuffisantes pour calculer le risque.",
+  "No hay registros aún (se requieren Check-out con UA calculado).":
+  "Aucun enregistrement pour l’instant (Check-out avec UA nécessaire).",
+
+  "No hay registros disponibles.":
+  "Aucun enregistrement disponible.",
+
+  "No hay registros disponibles en este periodo.": "Aucun enregistrement pour cette période.",
+  "No hay registros disponibles para análisis individual.": "Aucun enregistrement disponible pour une analyse individuelle.",
+  "No hay suficientes datos para calcular ACWR.": "Données insuffisantes pour calculer l’ACWR.",
+  "No hay suficientes datos para mostrar la tabla de template.":
+  "Données insuffisantes pour afficher le tableau de bien-être.",
+  "No se encontraron registros": "Aucun enregistrement trouvé",
+
+  "No se encontró la columna RPE.": "Colonne RPE introuvable.",
+  "No se encontró la columna UA.": "Colonne UA introuvable.",
+  "No se pudo calcular el riesgo: {e}": "Calcul du risque impossible : {e}",
+
+  "Número de días a generar": "Nombre de jours à générer",
+  "Partes del cuerpo con dolor": "Parties du corps douloureuses",
+  "Periodo:": "Période :",
+  "Plantel": "Équipe",
+  "Previsualización": "Aperçu",
+
+  "RPE (1-10)": "RPE (1-10)",
+  "RPE / :red[Cargas]": "RPE / :red[Charges]",
+  "RPE / Cargas": "RPE / Charges",
+  "Rango de fechas": "Plage de dates",
+  "Readaptación en campo": "Readaptation sur le terrain",
+
+  "Registro :red[:material/check_in_out:]": "Enregistrement :red[:material/check_in_out:]",
+
+  "Resumen de :red[template] (1er Equipo)": "Résumé du :red[Bien-être] (Équipe première)",
+  "Riesgo de :red[lesión (proximidad)]": "Risque de :red[blessure (proximité)]",
+
+  "Rol: {st.session_state[": "Rôle : {st.session_state[",
+
+  "Selecciona una jugadora para continuar.": "Sélectionnez une joueuse pour continuer.",
+  "Semilla aleatoria (seed)": "Graine aléatoire (seed)",
+  "Simulador de :red[Registros]": "Simulateur d’:red[enregistrements]",
+
+  "Tipo de registro": "Type d’enregistrement",
+  "Tipos de estímulo": "Types de stimulus",
+  "Tipos de carga": "Types de charge",
+  "Turno": "Tour",
+
+  "UA (RPE x minutos)": "UA (RPE x minutes)",
+  "UA total último día": "UA totale du dernier jour",
+
+  "Usuario": "Utilisateur",
+  "Usuario no encontrado o inactivo.": "Utilisateur introuvable ou inactif.",
+  "Usuario o contraseña incorrectos": "Utilisateur ou mot de passe incorrect.",
+
+  "Variabilidad semanal": "Variabilité hebdomadaire",
+
+  "Ya existe un registro para esta jugadora hoy en el mismo turno. Al guardar se actualizará el registro existente (upsert).":
+  "Un enregistrement existe déjà pour cette joueuse aujourd’hui dans le même tour. La sauvegarde mettra à jour l’enregistrement existant (upsert).",
+
+  "¿Está seguro de eliminar {len(ids_seleccionados)} elemento(s)?":
+  "Êtes-vous sûr de vouloir supprimer {len(ids_seleccionados)} élément(s) ?",
+
+  "⚠️ Error al cargar datos de {table_name}: {e}":
+  "⚠️ Erreur lors du chargement des données de {table_name} : {e}",
+
+  "✅ Generación de registros {tipo} completada con éxito.":
+  "✅ Génération des enregistrements {tipo} réussie.",
+
+  "✅ Todas las jugadoras han realizado el check-in.":
+  "✅ Toutes les joueuses ont effectué le check-in.",
+
+  "✅ Todas las jugadoras han realizado el check-out.":
+  "✅ Toutes les joueuses ont effectué le check-out.",
+
+  "❌ Error al generar registros: {e}":
+  "❌ Erreur lors de la génération des enregistrements : {e}",
+
+  "**Valores altos indican mejor bienestar** en Recuperación, Energía y Sueño.":
+  "**Des valeurs élevées indiquent un meilleur bien-être** en Récupération, Énergie et Sommeil.",
+
+  "**Valores bajos indican mejor bienestar** en Estrés y Dolor (escala invertida).":
+  "**Des valeurs basses indiquent un meilleur bien-être** en Stress et Douleur (échelle inversée).",
+
+  "Registros seleccionados:": "Enregistrements sélectionnés :",
+  ":material/delete: Eliminar seleccionados": ":material/delete: Supprimer sélectionnés",
+  ":material/download: Descargar registros en JSON": ":material/download: Télécharger enregistrements JSON",
+  ":material/delete: Eliminar": ":material/delete: Supprimer",
+  ":material/cancel: Cancelar": ":material/cancel: Annuler",
+
+  "elemento": "élément",
+  "Está seguro de eliminar": "Êtes-vous sûr de vouloir supprimer",
+  "seleccionar": "sélectionner",
+  "Confirmar": "Confirmer",
+
+  "Seleccione una Jugadora": "Sélectionnez une joueuse",
+
+  "Error inesperado al guardar el registro:": "Erreur inattendue lors de l’enregistrement :",
+
+  "Turno 1": "Tour 1",
+  "Turno 2": "Tour 2",
+  "Turno 3": "Tour 3",
+
+  ":material/table_chart: Resumen tabular": ":material/table_chart: Résumé tabulaire",
+  ":material/monitor_weight: Carga y esfuerzo": ":material/monitor_weight: Charge et effort",
+  ":material/trending_up: Índices de control": ":material/trending_up: Indices de contrôle",
+
+  "Carga total semanal (UA)": "Charge totale hebdomadaire (UA)",
+  "RPE promedio diario": "RPE moyen quotidien",
+
+  "Fecha": "Date",
+  "Valor del índice": "Valeur de l’indice",
+  "Carga (UA)": "Charge (UA)",
+
+  "Control de mesociclo": "Contrôle du mésocycle",
+  "Intensidad del entrenamiento o partido": "Intensité de l’entraînement ou du match",
+  "Volumen del microciclo": "Volume du microcycle",
+  "Estrés agudo": "Stress aigu",
+  "Control semanal equilibrado": "Contrôle hebdomadaire équilibré",
+  "Nivel de adaptación (Media)": "Niveau d’adaptation (Moyen)",
+  "Detectar sesiones demasiado parecidas": "Détecter les séances trop similaires",
+  "Balance entre fatiga aguda y crónica": "Équilibre entre fatigue aiguë et chronique",
+  "Índice de variabilidad semanal": "Indice de variabilité hebdomadaire",
+  "Relación entre fatiga aguda y crónica": "Relation entre fatigue aiguë et chronique",
+
+  "Evolución de RPE (color) y Carga Interna (barras)": "Évolution du RPE (couleur) et de la charge interne (barres)",
+  "Relación entre duración y esfuerzo percibido": "Relation entre durée et effort perçu",
+  "Evolución del índice ACWR (Relación Agudo:Crónico)":
+  "Évolution de l’indice ACWR (Ratio Aigu:Chronique)",
+  "Evolución de los indicadores de bienestar": "Évolution des indicateurs de bien-être",
+
+  "Observaciones": "Observations",
+  "Te encuentras en periodo de menstruación": "Vous êtes en période de menstruation",
+
+  ":material/physical_therapy: Indicadores de bienestar y carga":
+  ":material/physical_therapy: Indicateurs de bien-être et de charge",
+
+  ":material/info: **Criterio de riesgo en la tabla:** una jugadora se considera *en riesgo* si el **promedio de bienestar (1-5x5) < 15 puntos** o si la variable **Dolor > 3**. Este criterio combina el **riesgo global** (fatiga / bienestar bajo) y el **riesgo localizado** (molestias o dolor elevado).":
+  ":material/info: **Critère de risque dans le tableau :** une joueuse est considérée *à risque* si la **moyenne de bien-être (1-5×5) < 15 points** ou si la variable **Douleur > 3**. Ce critère combine le **risque global** (fatigue / faible bien-être) et le **risque localisé** (inconfort ou douleur élevée).",
+
+  "Ver tabla de referencia de escalas (1-5)": "Voir tableau de référence (1-5)",
+  "de": "de",
+  "jugadoras": "joueuses",
+  "con bienestar promedio <15 o dolor >3": "avec bien-être moyen <15 ou douleur >3",
+
+  "🟢 / 🔴 Los colores en los gráficos muestran *variaciones* respecto al periodo anterior (🔺 sube, 🔻 baja). Los colores en la interpretación reflejan *niveles fisiológicos* según umbrales deportivos.":
+  "🟢 / 🔴 Les couleurs dans les graphiques indiquent les *variations* par rapport à la période précédente (🔺 augmente, 🔻 diminue). Les couleurs dans l’interprétation reflètent les *niveaux physiologiques* selon les seuils sportifs.",
+
+  "Variable": "Variable",
+
+  "Muy mal recuperado": "Très mal récupéré",
+  "Extremadamente cansado": "Extrêmement fatigué",
+  "Muy mala calidad / Insomnio": "Très mauvaise qualité / Insomnie",
+  "Muy relajado / Positivo": "Très détendu / Positif",
+  "Sin dolor": "Sans douleur",
+  "Más fatigado de lo normal": "Plus fatigué que d’habitude",
+  "Fatigado": "Fatigué",
+  "Sueño inquieto o corto": "Sommeil agité ou court",
+  "Relajado": "Détendu",
+  "Dolor leve": "Douleur légère",
+  "Normal": "Normal",
+  "Sueño aceptable": "Sommeil acceptable",
+  "Estrés controlado": "Stress contrôlé",
+  "Molestias leves": "Léger inconfort",
+  "Recuperado": "Récupéré",
+  "Ligera fatiga / Buen estado": "Légère fatigue / Bon état",
+  "Buena calidad de sueño": "Bonne qualité de sommeil",
+  "Alto nivel de estrés": "Niveau de stress élevé",
+  "Dolor moderado": "Douleur modérée",
+  "Totalmente recuperado": "Totalement récupéré",
+  "Energía Máxima": "Énergie maximale",
+  "Excelente descanso": "Excellent repos",
+  "Muy estresado / Irritable": "Très stressé / Irritable",
+  "Dolor severo": "Douleur sévère",
+
+  "**Interpretación:**\n- En **Recuperación**, **Energía** y **Sueño** -> valores altos indican bienestar.\n- En **Estrés** y **Dolor** → valores bajos indican bienestar (escala invertida).":
+  "**Interprétation :**\n- En **Récupération**, **Énergie** et **Sommeil** → des valeurs élevées indiquent un bon bien-être.\n- En **Stress** et **Douleur** → des valeurs basses indiquent un bon bien-être (échelle inversée).",
+
+  "template (1-5)": "Bien-être (1-5)",
+  "Fatiga y ACWR": "Fatigue et ACWR",
+  "RPE y UA": "RPE et UA",
+  "Duración vs RPE": "Durée vs RPE",
+
+  "Sin datos suficientes para evaluar riesgo.": "Données insuffisantes pour évaluer le risque.",
+  "Riesgo alto de sobrecarga o fatiga acumulada.": "Risque élevé de surcharge ou de fatigue accumulée.",
+  "Riesgo moderado; controlar volumen y recuperación.": "Risque modéré ; surveiller le volume et la récupération.",
+  "Riesgo bajo; zona óptima de carga y adaptación.": "Risque faible ; zone optimale de charge et d’adaptation.",
+  "Carga muy baja; posible desadaptación o falta de estímulo.":
+  "Charge très faible ; possible désadaptation ou manque de stimulus.",
+
+  "alta": "élevée",
+  "moderada": "modérée",
+  "baja": "faible",
+  "elevada": "haute",
+  "controlada": "contrôlée",
+  "sin datos suficientes": "données insuffisantes",
+  "riesgo alto de sobrecarga": "risque élevé de surcharge",
+  "subcarga o falta de estímulo": "sous-charge ou manque de stimulus",
+  "relación óptima entre carga aguda y crónica":
+  "rapport optimal entre charge aiguë et chronique",
+  "sin datos de variabilidad": "pas de données de variabilité",
+  "poca variabilidad entre sesiones": "faible variabilité entre séances",
+  "variabilidad moderada": "variabilité modérée",
+  "buena variabilidad semanal": "bonne variabilité hebdomadaire",
+  "no disponible": "non disponible",
+  "negativa (predomina la fatiga)": "négative (fatigue prédominante)",
+  "neutral": "neutre",
+  "positiva (asimilación adecuada del entrenamiento)":
+  "positive (assimilation adéquate de l’entraînement)",
+
+  "Resumen técnico": "Résumé technique",
+  "En el último día registrado se completaron": "Lors du dernier jour enregistré, la séance comprenait",
+  "minutos": "minutes",
+  "de sesión con una carga interna de": "de séance avec une charge interne de",
+  "La carga semanal actual es": "La charge hebdomadaire actuelle est de",
+  "y la carga mensual acumulada asciende a": "et la charge mensuelle accumulée s’élève à",
+  "La fatiga aguda es": "La fatigue aiguë est",
+  "mientras que la fatiga crónica se mantiene en": "tandis que la fatigue chronique est à",
+  "de media": "en moyenne",
+  "indicando una adaptación": "indiquant une adaptation",
+  "El índice ACWR sugiere": "L’indice ACWR suggère",
+  "y la monotonía semanal refleja": "et la monotonie hebdomadaire reflète",
+
+  ":material/description: **Resumen técnico:**":
+  ":material/description: **Résumé technique :**",
+
+  "óptimo": "optimal",
+  "moderado": "modéré",
+  "en fatiga": "fatigué",
+  "sin datos": "sans données",
+  "bajo": "bas",
+  "alto": "élevé",
+  "sin jugadoras en zona roja": "aucune joueuse en zone rouge",
+  "1 jugadora en seguimiento": "1 joueuse en suivi",
+  "jugadoras en zona roja": "joueuses en zone rouge",
+  "El grupo muestra un estado de bienestar": "Le groupe présente un état de bien-être",
+  "con un esfuerzo percibido": "avec un effort perçu",
+  "La carga interna total es de": "La charge interne totale est de",
+  "y actualmente hay": "et actuellement il y a",
+  "debido a que el promedio de bienestar x 5 es menor a 15 puntos":
+  "car la moyenne de bien-être × 5 est inférieure à 15 points",
+  "(escala 25)": "(échelle 25)",
+  "indicando fatiga, sobrecarga o molestias significativas que aumentan el riesgo de lesión o bajo rendimiento":
+  "indiquant une fatigue, une surcharge ou un inconfort significatif augmentant le risque de blessure ou de contre-performance",
+
+  "Monday": "Lundi",
+  "Tuesday": "Mardi",
+  "Wednesday": "Mercredi",
+  "Thursday": "Jeudi",
+  "Friday": "Vendredi",
+  "Saturday": "Samedi",
+  "Sunday": "Dimanche",
+
+  ":red[:material/id_card: Identificación]":
+  ":red[:material/id_card: Identification]",
+
+  ":red[:material/sports_soccer: Plantel]":
+  ":red[:material/sports_soccer: Équipe]",
+
+  ":red[:material/cake: F. Nacimiento]":
+  ":red[:material/cake: Date de naissance]",
+
+  ":red[:material/globe: País]":
+  ":red[:material/globe: Pays]",
+
+  ":red[:material/person: Posición]":
+  ":red[:material/person: Poste]",
+
+  ":red[:material/favorite: Edad]":
+  ":red[:material/favorite: Âge]"
+}
