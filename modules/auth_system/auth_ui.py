@@ -26,7 +26,7 @@ def login_view() -> None:
             password = st.text_input("Contraseña", type="password", value="")
             submitted = st.form_submit_button("Iniciar sesión", type="primary")
 
-        right_caption("Template")
+        right_caption("Reportes")
 
         if submitted:
             user_data = load_user_from_db(username)
