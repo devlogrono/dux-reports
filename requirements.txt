@@ -1,5 +1,5 @@
 streamlit>=1.50.0
-numpy>=2.3.3
+numpy>=2.4.4
 pandas>=2.3.3
 PyJWT>=2.10.1
 st-cookies-manager>=0.2.2
