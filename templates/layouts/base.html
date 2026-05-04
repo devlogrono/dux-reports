@@ -56,84 +56,33 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarMain">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    {% if can_mod('users') or can_mod('permissions') or can_mod('roles') %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="seguridadDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            Seguridad
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="seguridadDropdown">
-                            {% if can_mod('users') %}
-                            <li><a class="dropdown-item" href="{{ url_for('users.users_list') }}">Usuarios</a></li>
-                            {% endif %}
-                            {% if can_mod('permissions') or can_mod('roles') %}
-                            <li><a class="dropdown-item" href="{{ url_for('permissions.roles_select') }}">Permisos</a></li>
-                            {% endif %}
-                            {% if can_mod('roles') %}
-                            <li><a class="dropdown-item" href="{{ url_for('roles.roles_list') }}">Roles</a></li>
-                            {% endif %}
-                        </ul>
-                    </li>
-                    {% endif %}
-                    {% if can_mod('media') %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="mediaDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Multimedia</a>
-                        <ul class="dropdown-menu" aria-labelledby="mediaDropdown">
-                            
-                            {% if can('media_view') %}
-<li><a class="dropdown-item" href="{{ url_for('multimedia.my_media') }}">Mis archivos</a></li>
-{% endif %}
-{% if can('read_media') %}
-<li><a class="dropdown-item" href="{{ url_for('multimedia.list_media') }}">Archivos</a></li>
-{% endif %}
-                            
-                        </ul>
-                    </li>
-                    {% endif %}
-                    {% set show_gest = can_mod('state_user') %}
-                    {% if show_gest %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="gestionesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            Gestiones
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="gestionesDropdown">
-                         
-                          {% if can_mod('users') %}
-                            <li><a class="dropdown-item" href="{{ url_for('users.users_list') }}">Usuarios</a></li>
-                          {% endif %}
-                            {% if can_mod('state_user') %}
-                            <li><a class="dropdown-item" href="{{ url_for('state_user.state_users_list') }}">Estados de futbolistas</a></li>
-                            {% endif %}
-                            {% if can_mod('notifications') %}
-                            <li><a class="dropdown-item" href="{{ url_for('notifications.list_all') }}">Notificaciones</a></li>
-                            {% endif %}
-                            {% if can('read_jugador') %}
-                            <li><a class="dropdown-item" href="{{ url_for('jugadores.list') }}">Futbolistas</a></li>
-                            {% endif %}
-                        </ul>
-                    </li>
-                    {% endif %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="dashboardDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Dashboards</a>
                         <ul class="dropdown-menu" aria-labelledby="dashboardDropdown">
-                            <li><a class="dropdown-item" href="{{ url_for('dashboard.prescriptor_report') }}">Prescriptores</a></li>
-                            {% if can('view_dashboard_directive') %}
-                            <li><a class="dropdown-item" href="{{ url_for('dashboard_directive.dashboard') }}">Dirección</a></li>
-                            {% endif %}
-                            <li><a class="dropdown-item" href="{{ url_for('dashboard_actas.index') }}">Actas</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('dashboard_actas.index') }}">Inicio</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('dashboard_futbolistas.index') }}">Futbolistas</a></li>
                         </ul>
                     </li>
                 </ul>
                 <div class="d-flex align-items-center">
-                    {% set unread = unread_count() %}
-                    <a class="position-relative badge bg-white text-dark shadow-sm me-3" style="border:1px solid rgba(0,0,0,.15);" href="{{ url_for('notifications.my_notifications') }}" title="Notificaciones">
-                        <i class="fs-5 notif-bell {% if unread %}bi bi-bell-fill text-danger{% else %}bi bi-bell text-secondary{% endif %}"></i>
-                        {% if unread %}<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ unread }}</span>{% endif %}
-                    </a>
-                    <a role="button" data-bs-toggle="offcanvas" href="#userInfoOffcanvas" aria-controls="userInfoOffcanvas" class="badge bg-white text-dark shadow-sm me-3 d-flex align-items-center text-decoration-none" style="border:1px solid rgba(0,0,0,.15);padding:10px;">
-                        <i class="bi bi-person-circle me-1"></i>{{ current_user.email }}
-                    </a>
-                    <!-- <a href="{{ url_for('auth.logout') }}" id="logoutBtn" class="btn btn-outline-secondary d-flex align-items-center" title="Cerrar sesión"><i class="bi bi-box-arrow-right"></i></a> -->
+                    <div class="dropdown">
+                        <button class="user-menu-btn dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="user-avatar">{{ (current_user.name or current_user.email)[0] | upper }}</span>
+                            <span class="user-display-name">{{ current_user.name or current_user.email }}</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end user-dropdown-menu" aria-labelledby="userDropdown">
+                            <li class="px-3 py-2">
+                                <div class="fw-semibold text-dark">{{ current_user.name or current_user.email }}</div>
+                                {% if current_user.name %}<div class="text-muted small">{{ current_user.email }}</div>{% endif %}
+                            </li>
+                            <li><hr class="dropdown-divider my-1"></li>
+                            <li>
+                                <a class="dropdown-item text-danger d-flex align-items-center gap-2" href="{{ url_for('auth.logout') }}" id="logoutBtn">
+                                    <i class="bi bi-box-arrow-right"></i> Cerrar sesión
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
@@ -157,16 +106,16 @@
     {% endwith %}
 
     <!-- Contenido principal -->
-    <div class="container-fluid flex-fill py-4">
+    <div class="container-fluid flex-fill main-content">
         {% block content %}{% endblock %}
     </div>
 
     <!-- Global Loading overlay -->
-<div id="globalLoading" class="position-fixed top-0 start-0 w-100 h-100 d-none justify-content-center align-items-center" style="background:rgba(255,255,255,.7);z-index:1050;">
-  <img src="{{ url_for('static', filename='img/loader.gif') }}" alt="cargando...">
+<div id="globalLoading" class="position-fixed top-0 start-0 w-100 h-100 d-none justify-content-center align-items-center" style="background:rgba(255,255,255,0.75);backdrop-filter:blur(4px);z-index:1050;">
+  <div class="app-spinner"></div>
 </div>
 <!-- Footer -->
-    <footer class="footer fixed-bottom py-3 bg-white border-top">
+    <footer class="footer py-3 bg-white border-top mt-auto">
         <div class="container text-center">
             <span class="text-muted">DUX © 2025</span>
         </div>
@@ -177,22 +126,22 @@
     <script>
       // Intercept links or buttons with data-confirm attribute
       // Logout loading overlay
-  document.addEventListener('DOMContentLoaded', function(){
-    const logout=document.getElementById('logoutBtn');
-    const overlay=document.getElementById('globalLoading');
-    if(logout){logout.addEventListener('click',()=>{overlay.classList.remove('d-none');overlay.classList.add('d-flex');});}
-    // Show loading on any navbar link click
-    document.querySelectorAll('.navbar a.nav-link:not(.dropdown-toggle), .navbar .dropdown-menu .dropdown-item').forEach(a=>{
-      a.addEventListener('click',()=>{
-        overlay.classList.remove('d-none');
-        overlay.classList.add('d-flex');
-      });
+document.addEventListener('DOMContentLoaded', function(){
+    const overlay = document.getElementById('globalLoading');
+
+    function showOverlay() {
+      overlay.classList.remove('d-none');
+      overlay.classList.add('d-flex');
+    }
+
+    // Navbar links
+    document.querySelectorAll('.navbar a.nav-link:not(.dropdown-toggle), .navbar .dropdown-menu .dropdown-item').forEach(a => {
+      a.addEventListener('click', showOverlay);
     });
-    // Sort dropdown items alphabetically (once on load)
-    document.querySelectorAll('.dropdown-menu').forEach(menu=>{
-      const lis=Array.from(menu.querySelectorAll('li')).filter(li=>!li.classList.contains('dropdown-divider'));
-      lis.sort((a,b)=>a.textContent.trim().localeCompare(b.textContent.trim(),'es',{sensitivity:'base'}));
-      lis.forEach(li=>menu.appendChild(li));
+
+    // Cualquier formulario de la página (filtros de dashboards, login, etc.)
+    document.querySelectorAll('form').forEach(form => {
+      form.addEventListener('submit', showOverlay);
     });
   });
 
@@ -219,51 +168,6 @@
         });
       });
     </script>
-<!-- Offcanvas User Info -->
-<div class="offcanvas offcanvas-end" tabindex="-1" id="userInfoOffcanvas" aria-labelledby="userInfoOffcanvasLabel">
-  <div class="offcanvas-header">
-    <h5 class="offcanvas-title" id="userInfoOffcanvasLabel">Datos de usuario</h5>
-    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-  </div>
-  <div class="offcanvas-body">
-    <ul class="list-group mb-3">
-      <li class="list-group-item d-flex justify-content-between"><span>Email</span><span>{{ current_user.email }}</span></li>
-      {% if current_user.cellular %}<li class="list-group-item d-flex justify-content-between"><span>Celular</span><span>{{ current_user.cellular }}</span></li>{% endif %}
-      {% if current_user.name %}
-      <li class="list-group-item d-flex justify-content-between"><span>Nombre</span><span>{{ current_user.name }}</span></li>
-      {% endif %}
-      {% if current_user.role %}
-      <li class="list-group-item d-flex justify-content-between"><span>Rol</span><span>{{ current_user.role }}</span></li>
-      {% endif %}
-      {% if current_user.created_at %}
-      <li class="list-group-item d-flex justify-content-between"><span>Creado</span><span>{{ current_user.created_at.strftime('%d/%m/%Y') }}</span></li>
-      {% endif %}
-    </ul>
-
-     {% if current_prescriptor %}
-         <h6 class="mt-3">Datos de prescriptor</h6>
-      <div class="text-center mb-2">
-        {% if presc_photo_url %}<img src="{{ presc_photo_url }}" class="img-thumbnail mb-2" style="max-width:120px">{% endif %}
-      </div>
-      <ul class="list-group mb-3">
-       {% if current_prescriptor.squeeze_page_name %}<li class="list-group-item d-flex justify-content-between"><span>Nombre SP</span><span>{{ current_prescriptor.squeeze_page_name }}</span></li>{% endif %}
-       {% if current_prescriptor.squeeze_page_status %}<li class="list-group-item d-flex justify-content-between"><span>Estado SP</span><span>{{ current_prescriptor.squeeze_page_status }}</span></li>{% endif %}
-       {% if current_prescriptor.face_url %}<li class="list-group-item d-flex justify-content-between"><span>Facebook</span><a href="{{ current_prescriptor.face_url }}" target="_blank"><i class="bi bi-facebook"></i></a></li>{% endif %}
-       {% if current_prescriptor.linkedin_url %}<li class="list-group-item d-flex justify-content-between"><span>LinkedIn</span><a href="{{ current_prescriptor.linkedin_url }}" target="_blank"><i class="bi bi-linkedin"></i></a></li>{% endif %}
-       {% if current_prescriptor.instagram_url %}<li class="list-group-item d-flex justify-content-between"><span>Instagram</span><a href="{{ current_prescriptor.instagram_url }}" target="_blank"><i class="bi bi-instagram"></i></a></li>{% endif %}
-       {% set wa = current_prescriptor.whatsapp_number if current_prescriptor.whatsapp_number is defined else (current_prescriptor.whatsapp_namber if current_prescriptor.whatsapp_namber is defined else None) %}
-       {% if wa %}<li class="list-group-item d-flex justify-content-between"><span>WhatsApp</span><a href="https://wa.me/{{ wa|replace(' ','') }}" target="_blank"><i class="bi bi-whatsapp"></i></a></li>{% endif %}
-       {% if current_prescriptor.x_url %}<li class="list-group-item d-flex justify-content-between"><span>X/Twitter</span><a href="{{ current_prescriptor.x_url }}" target="_blank"><i class="bi bi-twitter"></i></a></li>{% endif %}
-       <li class="list-group-item d-flex justify-content-between"><span>Squeeze Page</span><a href="/p/{{ current_prescriptor.id }}" target="_blank"><i class="bi bi-link-45deg"></i></a></li>
-       {% if current_prescriptor.payment_details %}<li class="list-group-item"><span class="fw-semibold d-block">Datos de pago</span><span class="d-block small">{{ current_prescriptor.payment_details | replace('\n','<br>') | safe }}</span></li>{% endif %}
-       {% if presc_contract_url %}<li class="list-group-item text-center"><a href="{{ presc_contract_url }}" class="btn btn-outline-primary btn-sm" target="_blank"><i class="bi bi-file-earmark-pdf"></i> Descargar contrato</a></li>{% endif %}
-      </ul>
-      {% if current_prescriptor %}<a href="{{ url_for('prescriptors.edit_my_prescriptor') }}" class="btn btn-outline-primary w-100 mb-2">Actualizar mis datos</a>{% endif %}
-      {% endif %}
- 
-      <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-danger w-100">Cerrar sesión</a>
-  </div>
-</div>
 
 {% block scripts %}{% endblock %}
 

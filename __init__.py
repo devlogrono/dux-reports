@@ -1,7 +1,7 @@
 """DUX Flask application package.
 
-Provides the app factory `create_app` and shared extensions `db`, `bcrypt`, and
-`login_manager` used across controllers.
+Provides the app factory `create_app` and shared extensions `db`, `bcrypt`,
+`login_manager` and `cache` used across controllers.
 """
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from flask import Flask, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, current_user
+from flask_caching import Cache
 
 from .config import Config
 
@@ -17,6 +18,7 @@ from .config import Config
 db = SQLAlchemy()
 bcrypt = Bcrypt()
 login_manager = LoginManager()
+cache = Cache()
 
 
 def create_app(config_object: type[Config] | None = None) -> Flask:
@@ -45,6 +47,9 @@ def create_app(config_object: type[Config] | None = None) -> Flask:
     login_manager.init_app(app)
     login_manager.login_view = "auth.login_get"
     login_manager.login_message_category = "info"
+    app.config.setdefault("CACHE_TYPE", "SimpleCache")
+    app.config.setdefault("CACHE_DEFAULT_TIMEOUT", 3600)
+    cache.init_app(app)
 
     # User loader based on reflected `users` table
     @login_manager.user_loader
@@ -85,58 +90,27 @@ def create_app(config_object: type[Config] | None = None) -> Flask:
         except Exception:
             return False
 
-    def _unread_count() -> int:
-        try:
-            if not current_user or not current_user.is_authenticated:
-                return 0
-            from dux.models import Base  # lazy import
-            Notification = getattr(Base.classes, "notifications", None)
-            if Notification is None:
-                return 0
-            return db.session.query(Notification).filter_by(user_id=current_user.id, is_read=0).count()
-        except Exception:
-            return 0
-
     app.jinja_env.globals.update(
         can_mod=_can_mod,
         can=_can,
-        unread_count=_unread_count,
     )
 
     # Register blueprints (import inside function to avoid circular imports)
     from .controllers.auth_controller import auth_bp
-    from .controllers.dashboard_controller import dashboard_bp
-    from .controllers.dashboard_directive_controller import bp as dashboard_directive_bp
     from .controllers.landing_controller import landing_bp
     from .controllers.admin_controller import admin_bp
-    from .controllers.multimedia_controller import multimedia_bp
-    from .controllers.notifications_controller import notifications_bp
-    from .controllers.permissions_controller import perm_bp
-    from .controllers.roles_controller import roles_bp
-    from .controllers.state_user_controller import state_user_bp
-    from .controllers.jugadores_controller import jugadores_bp
-    from .controllers.users_controller import users_bp
     from .controllers.dashboard_actas_controller import bp as dashboard_actas_bp
     from .controllers.dashboard_futbolistas_controller import bp as dashboard_futbolistas_bp
 
     app.register_blueprint(auth_bp)
-    app.register_blueprint(dashboard_bp)
-    app.register_blueprint(dashboard_directive_bp)
     app.register_blueprint(landing_bp)
     app.register_blueprint(admin_bp)
-    app.register_blueprint(multimedia_bp)
-    app.register_blueprint(notifications_bp)
-    app.register_blueprint(perm_bp)
-    app.register_blueprint(roles_bp)
-    app.register_blueprint(state_user_bp)
-    app.register_blueprint(jugadores_bp)
-    app.register_blueprint(users_bp)
     app.register_blueprint(dashboard_actas_bp)
     app.register_blueprint(dashboard_futbolistas_bp)
 
     # Root route -> redirect to dashboard or login
     @app.get("/")
     def index():
-        return redirect(url_for("dashboard.dashboard_home"))
+        return redirect(url_for("dashboard_actas.index"))
 
     return app
