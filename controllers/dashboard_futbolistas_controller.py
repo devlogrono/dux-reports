@@ -2,12 +2,13 @@ from flask import Blueprint, render_template, request
 from flask_login import login_required
 from sqlalchemy import text
 from collections import Counter
-from dux import db
+from dux import db, cache
 
 bp = Blueprint("dashboard_futbolistas", __name__, url_prefix="/dashboard/futbolistas")
 
 @bp.get("/")
 @login_required
+@cache.cached(timeout=3600, query_string=True)
 def index():
     seleccionadas = request.args.getlist('jugadoras')
     seleccionadas_competicion = request.args.getlist('competicion')
@@ -95,6 +96,7 @@ def index():
 
 @bp.get("/caracteristicas")
 @login_required
+@cache.cached(timeout=3600, query_string=True)
 def caracteristicas():
     """Dashboard de características: distribución de futbolistas por competición.
     Reutiliza los mismos filtros para permitir enfocar por nombres/competición.
@@ -248,6 +250,7 @@ def caracteristicas():
 
 @bp.get("/estadisticas")
 @login_required
+@cache.cached(timeout=3600, query_string=True)
 def estadisticas():
     """Dashboard de estadísticas por usuario desde actas."""
     seleccionadas = request.args.getlist('jugadoras')
@@ -344,6 +347,7 @@ def estadisticas():
 
 @bp.get("/analisis-equipo")
 @login_required
+@cache.cached(timeout=3600, query_string=True)
 def analisis_equipo():
     """Dashboard de análisis del equipo con único filtro de competición."""
     seleccionadas_competicion = request.args.getlist('plantel') or request.args.getlist('competicion')
@@ -429,11 +433,6 @@ def analisis_equipo():
         'partidos_jugados': partidos_jugados,
     }
 
-    print("DEBUG seleccionadas_competicion:", seleccionadas_competicion, flush=True)
-    print("DEBUG per_jugador len:", len(per_jugador), flush=True)
-    if per_jugador:
-        print("DEBUG per_jugador sample:", per_jugador[:5], flush=True)
-
     return render_template(
         "dashboard/analisis_equipo.html",
         competiciones=competiciones,
@@ -444,6 +443,7 @@ def analisis_equipo():
 
 @bp.get("/sustituciones")
 @login_required
+@cache.cached(timeout=3600, query_string=True)
 def sustituciones():
     """Análisis de las sustituciones por equipo (minutos, top combos, etc.)."""
 

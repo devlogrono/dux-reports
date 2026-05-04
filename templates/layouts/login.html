@@ -9,73 +9,57 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="../static/css/auth_light.css">
     <style>
-      body{
-        background:url('{{ url_for('static', filename='img/fondo8.jpg') }}') no-repeat center center fixed;
-        background-size:cover;
+      body {
+        background: url('{{ url_for('static', filename='img/fondo8.jpg') }}') no-repeat center center fixed;
+        background-size: cover;
+      }
+      h1.page-title {
+        color: #ffffff;
+        text-shadow: 0 2px 8px rgba(0,0,0,0.6);
       }
     </style>
 </head>
 <body>
-    <!-- <a href="https://sportsdatacampus.com/" class="logo" target="_blank">
-        <img style="width: 400px; height: 100px;" src="../static/img/logos/SDC_horizontal_monocromo_negro.svg" alt="">
-    </a> -->
     <div class="section">
         <div class="container">
-            <h1 class="fw-semibold text-center " style="font-size:2.8rem; margin-top: 10vh; margin-bottom: 1vh;">Sistema Integral de Gestión</h1>
+            <h1 class="page-title fw-semibold text-center" style="font-size:2.8rem; margin-top: 10vh; margin-bottom: 1vh;">Módulo de Reportes</h1>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                <div class="row justify-content-center mt-3">
+                  <div class="col-12 col-sm-8 col-md-6 col-lg-5">
+                    {% for category, message in messages %}
+                      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endif %}
+            {% endwith %}
 
             <div class="row justify-content-center">
                 <div class="col-12 text-center align-self-center py-5">
                     <div class="section pb-5 pt-5 pt-sm-2 text-center">
-                        <h6 class="mb-0 pb-3"><span>Ingresar </span><span>Contactanos</span></h6>
-                        <input class="checkbox" type="checkbox" id="reg-log" name="reg-log"/>
-                        <label for="reg-log"></label>
                         <div class="card-3d-wrap mx-auto">
                             <div class="card-3d-wrapper">
                                 <div class="card-front">
                                     <div class="center-wrap">
-                                        
-                                            <div class="section text-center">
-                                                <h4 class="mb-4 pb-3">Iniciar Sesión</h4>
-                                                <form id="loginForm" method="post">
-                                                    {{ form.csrf_token }}
-                                                    <div class="form-group">
-                                                        {{ form.email(class="form-style", placeholder="Tu Email", autocomplete="off") }}
-                                                        <i class="input-icon uil uil-at"></i>
-                                                    </div>	
-                                                    <div class="form-group mt-2">
-                                                        {{ form.password(class="form-style", placeholder="Tu Contraseña", autocomplete="off") }}
-                                                        <i class="input-icon uil uil-lock-alt"></i>
-                                                    </div>
-                                                    <div class="form-check mb-3 mt-3">
-                                                        {{ form.remember(style="left: 100px; margin-top: -3px; accent-color: #6c757d !important; border-color: #6c757d !important; background-color: #6c757d !important;",class="checkbox-gray")  }}
-                                                        {{ form.remember.label(class="form-check-label") }}
-                                                    </div>
-                                                    {{ form.submit(class="btn mt-4") }}
-                                                    <p class="mb-0 mt-4 text-center"><a href="{{ url_for('auth.forgot_get') }}" class="link" style="color: #a2a1a6 !important;">¿Olvidaste tu contraseña?</a></p>
-                                                </form>
-                                            </div>
-                                       
-                                    </div>
-                                </div>
-                                <div class="card-back">
-                                    <div class="center-wrap">
                                         <div class="section text-center">
-                                            <h4 class="mb-4 pb-3">Contactanos</h4>
-                                            <form id="contactForm" method="post" action="{{ url_for('auth.contact_post') }}">{{ form.csrf_token }}
-                                             <div class="form-group">
-                                                 <input type="text" name="name" class="form-style" placeholder="Nombre completo" autocomplete="off" required>
-                                                 <i class="input-icon uil uil-user"></i>
-                                             </div>
-                                            <div class="form-group mt-2">
-                                                <input type="email" name="email" class="form-style" placeholder="Tu email" autocomplete="off" required>
-                                                <i class="input-icon uil uil-at"></i>
-                                            </div>	
-                                            <div class="form-group mt-2">
-                                                <textarea name="message" class="form-style" placeholder="Cuéntanos..." rows="4" required></textarea>
-                                                <i class="input-icon uil uil-lock-alt"></i>
-                                            </div>
-                                            <button type="submit" class="btn mt-4">Enviar</button>
-                                             </form>
+                                            <h4 class="mb-4 pb-3">Iniciar Sesión</h4>
+                                            <form id="loginForm" method="post">
+                                                {{ form.csrf_token }}
+                                                <div class="form-group">
+                                                    {{ form.email(class="form-style", placeholder="Tu Email", autocomplete="email") }}
+                                                    <i class="input-icon uil uil-at"></i>
+                                                </div>
+                                                <div class="form-group mt-2">
+                                                    {{ form.password(class="form-style", placeholder="Tu Contraseña", autocomplete="current-password") }}
+                                                    <i class="input-icon uil uil-lock-alt"></i>
+                                                </div>
+                                                {{ form.submit(class="btn mt-4") }}
+                                            </form>
                                         </div>
                                     </div>
                                 </div>
@@ -88,22 +72,20 @@
     </div>
 
 <!-- Loading overlay -->
-<div id="loginLoading" class="position-fixed top-0 start-0 w-100 h-100 d-none justify-content-center align-items-center" style="background:rgba(255,255,255,.7);z-index:1050;">
-  <img src="{{ url_for('static', filename='img/loader.gif') }}" alt="cargando...">
+<div id="loginLoading" class="position-fixed top-0 start-0 w-100 h-100 d-none justify-content-center align-items-center" style="background:rgba(255,255,255,0.75);backdrop-filter:blur(4px);z-index:1050;">
+  <div class="app-spinner"></div>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', function(){
     const overlay = document.getElementById('loginLoading');
     const form = document.getElementById('loginForm');
-    
     if(form){
       form.addEventListener('submit', function(){
         overlay.classList.remove('d-none');
         overlay.classList.add('d-flex');
       });
     }
-      const cform=document.getElementById('contactForm');
-    if(cform){cform.addEventListener('submit',()=>{overlay.classList.remove('d-none');overlay.classList.add('d-flex');});}
   });
 </script>
 </body>

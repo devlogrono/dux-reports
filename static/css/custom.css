@@ -18,6 +18,12 @@ body {
 .navbar {
   background: var(--dux-primary) !important;
   border-bottom: 1px solid rgba(255,255,255,0.15);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 1055;
 }
 .navbar .navbar-brand,
 .navbar .nav-link,
@@ -153,4 +159,74 @@ h1, h2, h3 {
   display: block;
   margin: 0 auto;
   box-shadow: 0 0 2px rgba(0,0,0,.25);
+}
+
+/* Espacio para que el navbar fijo (top) y el footer no tapen el contenido */
+.main-content {
+  padding-top: 5rem;
+  padding-bottom: 2rem;
+}
+
+/* ======= USER MENU ======= */
+.user-menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 2rem;
+  padding: 0.3rem 0.85rem 0.3rem 0.3rem;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.user-menu-btn:hover,
+.user-menu-btn:focus {
+  background: rgba(255,255,255,0.22);
+  color: #fff;
+  outline: none;
+}
+.user-menu-btn::after {
+  border-top-color: rgba(255,255,255,0.8);
+}
+.user-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--dux-primary);
+  font-weight: 700;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.user-display-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-dropdown-menu {
+  min-width: 230px;
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.14);
+  border: 1px solid rgba(0,0,0,0.07);
+  overflow: hidden;
+}
+
+/* ======= SPINNER GLOBAL ======= */
+.app-spinner {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 5px solid rgba(124, 38, 41, 0.15);
+  border-top-color: var(--dux-primary);
+  animation: app-spin 0.75s linear infinite;
+}
+@keyframes app-spin {
+  to { transform: rotate(360deg); }
 }
