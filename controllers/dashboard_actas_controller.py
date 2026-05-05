@@ -1,13 +1,19 @@
 from flask import Blueprint, render_template, request
-from flask_login import login_required
+from flask_login import login_required, current_user
 from sqlalchemy import text
 from dux import db, cache
 
 bp = Blueprint("dashboard_actas", __name__, url_prefix="/dashboard/actas")
 
+
+def _user_cache_key():
+    user_id = current_user.id if current_user.is_authenticated else "anon"
+    return f"view//{request.path}?{request.query_string.decode()}&_uid={user_id}"
+
+
 @bp.get("/")
 @login_required
-@cache.cached(timeout=3600, query_string=True)
+@cache.cached(timeout=3600, make_cache_key=_user_cache_key)
 def index():
     Comp = getattr(__import__('dux.models', fromlist=['Base']).Base.classes, "competiciones", None)
     DiccComp = getattr(__import__('dux.models', fromlist=['Base']).Base.classes, "diccionario_competiciones", None)

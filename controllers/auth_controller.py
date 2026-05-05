@@ -233,12 +233,5 @@ def login_post():
 def logout():
     _audit_event(current_user.id if current_user.is_authenticated else None, True, "LOGOUT")
     logout_user()
-    # Cierra la sesión del contexto actual
     db.session.remove()
-    # Fuerza cierre del pool completo
-    try:
-        db.engine.dispose(close=True)
-    except Exception:
-        current_app.logger.exception("Error disposing engine on logout")
-    # flash("Sesión finalizada", "info")
     return redirect(url_for("auth.login_get"))

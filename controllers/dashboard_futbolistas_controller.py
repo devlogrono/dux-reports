@@ -1,14 +1,20 @@
 from flask import Blueprint, render_template, request
-from flask_login import login_required
+from flask_login import login_required, current_user
 from sqlalchemy import text
 from collections import Counter
 from dux import db, cache
 
 bp = Blueprint("dashboard_futbolistas", __name__, url_prefix="/dashboard/futbolistas")
 
+
+def _user_cache_key():
+    user_id = current_user.id if current_user.is_authenticated else "anon"
+    return f"view//{request.path}?{request.query_string.decode()}&_uid={user_id}"
+
+
 @bp.get("/")
 @login_required
-@cache.cached(timeout=3600, query_string=True)
+@cache.cached(timeout=3600, make_cache_key=_user_cache_key)
 def index():
     seleccionadas = request.args.getlist('jugadoras')
     seleccionadas_competicion = request.args.getlist('competicion')
@@ -96,7 +102,7 @@ def index():
 
 @bp.get("/caracteristicas")
 @login_required
-@cache.cached(timeout=3600, query_string=True)
+@cache.cached(timeout=3600, make_cache_key=_user_cache_key)
 def caracteristicas():
     """Dashboard de características: distribución de futbolistas por competición.
     Reutiliza los mismos filtros para permitir enfocar por nombres/competición.
@@ -250,7 +256,7 @@ def caracteristicas():
 
 @bp.get("/estadisticas")
 @login_required
-@cache.cached(timeout=3600, query_string=True)
+@cache.cached(timeout=3600, make_cache_key=_user_cache_key)
 def estadisticas():
     """Dashboard de estadísticas por usuario desde actas."""
     seleccionadas = request.args.getlist('jugadoras')
@@ -347,7 +353,7 @@ def estadisticas():
 
 @bp.get("/analisis-equipo")
 @login_required
-@cache.cached(timeout=3600, query_string=True)
+@cache.cached(timeout=3600, make_cache_key=_user_cache_key)
 def analisis_equipo():
     """Dashboard de análisis del equipo con único filtro de competición."""
     seleccionadas_competicion = request.args.getlist('plantel') or request.args.getlist('competicion')
@@ -443,7 +449,7 @@ def analisis_equipo():
 
 @bp.get("/sustituciones")
 @login_required
-@cache.cached(timeout=3600, query_string=True)
+@cache.cached(timeout=3600, make_cache_key=_user_cache_key)
 def sustituciones():
     """Análisis de las sustituciones por equipo (minutos, top combos, etc.)."""
 
