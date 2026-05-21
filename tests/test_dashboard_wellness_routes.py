@@ -1,3 +1,4 @@
+from datetime import date
 import os
 import sqlite3
 import tempfile
@@ -34,6 +35,65 @@ class DashboardWellnessRouteTest(unittest.TestCase):
             VALUES ('test-user', 'test@example.com', '', 2, 'Test')
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE futbolistas (
+                identificacion TEXT PRIMARY KEY,
+                nombre TEXT,
+                apellido TEXT,
+                competicion TEXT,
+                genero TEXT,
+                id_estado INTEGER
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE wellness (
+                id INTEGER PRIMARY KEY,
+                id_jugadora TEXT,
+                fecha_sesion DATE,
+                tipo TEXT,
+                turno TEXT,
+                recuperacion INTEGER,
+                fatiga INTEGER,
+                sueno INTEGER,
+                stress INTEGER,
+                dolor INTEGER,
+                minutos_sesion INTEGER,
+                rpe REAL,
+                ua REAL,
+                observacion TEXT,
+                fecha_hora_registro DATETIME,
+                usuario TEXT,
+                estatus_id INTEGER
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO futbolistas (
+                identificacion, nombre, apellido, competicion, genero, id_estado
+            )
+            VALUES ('player-1', 'Alexia', 'Test', '1FF', 'F', 1)
+            """
+        )
+        today = date.today().isoformat()
+
+        conn.execute(
+            """
+            INSERT INTO wellness (
+                id, id_jugadora, fecha_sesion, tipo, turno, recuperacion, fatiga,
+                sueno, stress, dolor, minutos_sesion, rpe, ua, observacion,
+                fecha_hora_registro, usuario, estatus_id
+            )
+            VALUES (
+                1, 'player-1', ?, 'checkOut', 'mañana', 4, 3,
+                5, 2, 1, 60, 5, 300, '', ?, 'test', 2
+            )
+            """,
+            (today, f"{today} 09:00:00"),
+        )
         conn.commit()
         conn.close()
 
@@ -61,7 +121,11 @@ class DashboardWellnessRouteTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Wellness", response.data)
-        self.assertIn(b"Dashboard inicial de Wellness", response.data)
+        self.assertIn(b"Registros de Wellness y RPE", response.data)
+        self.assertIn(b"Test, Alexia", response.data)
+        self.assertIn(b"1FF", response.data)
+        self.assertIn(b"checkOut", response.data)
+        self.assertIn(b"300.0", response.data)
 
 
 if __name__ == "__main__":
