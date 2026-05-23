@@ -4,14 +4,134 @@
 
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="rounded shadow-sm p-4" style="background-color: rgba(255,255,255,0.9);">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+    <div class="rounded shadow-sm p-4 mb-4" style="background-color: rgba(255,255,255,0.92);">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
             <div>
                 <h1 class="h3 mb-1">Wellness</h1>
-                <p class="text-muted mb-0">Dashboard inicial de Wellness y RPE.</p>
+                <p class="text-muted mb-0">Registros de Wellness y RPE cargados desde la base de datos.</p>
             </div>
-            <span class="badge text-bg-secondary">En migración</span>
+            <span class="badge text-bg-primary">Vista inicial</span>
         </div>
+
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label for="plantel" class="form-label">Plantel</label>
+                <select id="plantel" name="plantel" class="form-select" multiple>
+                    {% for plantel in planteles %}
+                        <option value="{{ plantel }}" {% if plantel in selected_planteles %}selected{% endif %}>
+                            {{ plantel }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-4">
+                <label for="jugadora" class="form-label">Jugadora</label>
+                <select id="jugadora" name="jugadora" class="form-select" multiple>
+                    {% for jugadora in jugadoras %}
+                        <option value="{{ jugadora.id }}" {% if jugadora.id in selected_jugadoras %}selected{% endif %}>
+                            {{ jugadora.nombre }}{% if jugadora.plantel %} · {{ jugadora.plantel }}{% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <label for="tipo" class="form-label">Tipo</label>
+                <select id="tipo" name="tipo" class="form-select" multiple>
+                    {% for tipo in tipos %}
+                        <option value="{{ tipo }}" {% if tipo in selected_tipos %}selected{% endif %}>
+                            {{ tipo }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-1">
+                <label for="days" class="form-label">Días</label>
+                <input id="days" name="days" class="form-control" type="number" min="1" max="365" value="{{ days }}">
+            </div>
+
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">Filtrar</button>
+                <a href="{{ url_for('dashboard_wellness.index') }}" class="btn btn-outline-secondary">Limpiar</a>
+            </div>
+        </form>
+    </div>
+
+    {% if error %}
+        <div class="alert alert-warning" role="alert">{{ error }}</div>
+    {% endif %}
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="rounded shadow-sm p-3 h-100" style="background-color: rgba(255,255,255,0.92);">
+                <div class="text-muted small text-uppercase">Registros</div>
+                <div class="fs-3 fw-bold">{{ summary.total }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="rounded shadow-sm p-3 h-100" style="background-color: rgba(255,255,255,0.92);">
+                <div class="text-muted small text-uppercase">Wellness promedio</div>
+                <div class="fs-3 fw-bold">{{ summary.wellness_promedio if summary.wellness_promedio is not none else '-' }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="rounded shadow-sm p-3 h-100" style="background-color: rgba(255,255,255,0.92);">
+                <div class="text-muted small text-uppercase">RPE promedio</div>
+                <div class="fs-3 fw-bold">{{ summary.rpe_promedio if summary.rpe_promedio is not none else '-' }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="rounded shadow-sm p-3 h-100" style="background-color: rgba(255,255,255,0.92);">
+                <div class="text-muted small text-uppercase">UA total</div>
+                <div class="fs-3 fw-bold">{{ summary.ua_total if summary.ua_total is not none else '-' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="rounded shadow-sm p-3" style="background-color: rgba(255,255,255,0.92);">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <h2 class="h5 mb-0">Últimos registros</h2>
+            <span class="text-muted small">Mostrando hasta 200 registros</span>
+        </div>
+
+        {% if records %}
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Jugadora</th>
+                            <th>Plantel</th>
+                            <th>Tipo</th>
+                            <th>Turno</th>
+                            <th class="text-end">Wellness</th>
+                            <th class="text-end">RPE</th>
+                            <th class="text-end">UA</th>
+                            <th>Usuario</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in records %}
+                            <tr>
+                                <td>{{ record.fecha_sesion }}</td>
+                                <td>{{ record.nombre_jugadora }}</td>
+                                <td>{{ record.plantel or '-' }}</td>
+                                <td>{{ record.tipo or '-' }}</td>
+                                <td>{{ record.turno or '-' }}</td>
+                                <td class="text-end">{{ record.wellness_score if record.wellness_score is not none else '-' }}</td>
+                                <td class="text-end">{{ record.rpe if record.rpe is not none else '-' }}</td>
+                                <td class="text-end">{{ record.ua if record.ua is not none else '-' }}</td>
+                                <td>{{ record.usuario or '-' }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-muted mb-0">No hay registros de Wellness para los filtros seleccionados.</p>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
