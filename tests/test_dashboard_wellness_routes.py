@@ -5,7 +5,7 @@ import tempfile
 import unittest
 
 from dux import create_app
-from dux.controllers.dashboard_wellness_controller import _build_summary
+from dux.controllers.dashboard_wellness_controller import _build_daily_charts, _build_summary
 from dux.models import Base
 
 
@@ -129,6 +129,9 @@ class DashboardWellnessRouteTest(unittest.TestCase):
         self.assertIn(b"15.0/25", response.data)
         self.assertIn(b"0/1", response.data)
         self.assertIn(b"300.0", response.data)
+        self.assertIn(b'id="chart-wellness"', response.data)
+        self.assertIn(b'id="chart-rpe"', response.data)
+        self.assertIn(b'id="chart-ua"', response.data)
 
     def test_build_summary_uses_legacy_wellness_kpis(self):
         records = [
@@ -171,6 +174,35 @@ class DashboardWellnessRouteTest(unittest.TestCase):
         self.assertEqual(summary["alertas_count"], 1)
         self.assertEqual(summary["alertas_total_jugadoras"], 2)
         self.assertEqual(summary["alertas_pct"], 50.0)
+
+    def test_build_daily_charts_aggregates_records_by_date(self):
+        records = [
+            {
+                "fecha_sesion": date(2026, 5, 20),
+                "wellness_score": 10,
+                "rpe": 4,
+                "ua": 200,
+            },
+            {
+                "fecha_sesion": date(2026, 5, 20),
+                "wellness_score": 20,
+                "rpe": 6,
+                "ua": 360,
+            },
+            {
+                "fecha_sesion": date(2026, 5, 21),
+                "wellness_score": 15,
+                "rpe": 5,
+                "ua": 300,
+            },
+        ]
+
+        charts = _build_daily_charts(records)
+
+        self.assertEqual(charts["labels"], ["2026-05-20", "2026-05-21"])
+        self.assertEqual(charts["wellness"], [15.0, 15.0])
+        self.assertEqual(charts["rpe"], [5.0, 5.0])
+        self.assertEqual(charts["ua"], [560, 300])
 
 
 if __name__ == "__main__":
