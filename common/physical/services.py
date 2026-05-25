@@ -239,6 +239,57 @@ def _build_technical_summary(metrics: list[dict[str, Any]]) -> dict[str, Any]:
     return {metric["key"]: metric for metric in metrics}
 
 
+def _perfil_cuadrante(x_value: float, y_value: float) -> tuple[str, str]:
+    if x_value <= 70 and y_value >= 3.80:
+        return "G1", "#2ECC71"
+    if x_value > 70 and y_value >= 3.80:
+        return "G2", "#F1C40F"
+    if x_value <= 70 and y_value < 3.80:
+        return "G3", "#F39C12"
+    return "G4", "#E74C3C"
+
+
+def _build_perfil_antropometrico_chart(records: list[dict[str, Any]]) -> dict[str, Any]:
+    plot_records = _latest_records_by_player(records)
+    points = []
+
+    for record in plot_records:
+        x_value = _safe_float(record.get("suma_6_pliegues_mm"))
+        y_value = _safe_float(record.get("idx_musculo_oseo"))
+        if x_value is None or y_value is None:
+            continue
+
+        group, color = _perfil_cuadrante(x_value, y_value)
+        player_name = str(record.get("nombre_jugadora") or "").strip()
+        points.append(
+            {
+                "jugadora": player_name,
+                "x": round(x_value, 2),
+                "y": round(y_value, 4),
+                "grupo": group,
+                "color": color,
+                "label": f"{player_name.title()} ({x_value:.1f}; {y_value:.2f})",
+            }
+        )
+
+    counts = {group: 0 for group in ("G1", "G2", "G3", "G4")}
+    for point in points:
+        counts[point["grupo"]] += 1
+
+    y_values = [point["y"] for point in points]
+    y_min = min(3.2, min(y_values) - 0.1) if y_values else 3.2
+    y_max = max(4.5, max(y_values) + 0.1) if y_values else 4.5
+
+    return {
+        "points": points,
+        "counts": counts,
+        "x_cut": 70,
+        "y_cut": 3.80,
+        "x_range": [30, 150],
+        "y_range": [round(y_min, 2), round(y_max, 2)],
+    }
+
+
 def build_physical_grupal_context(plantel: str | None = None, periodo: str = "ultima") -> dict[str, Any]:
     """
     Contexto de la vista grupal read-only.
@@ -258,6 +309,7 @@ def build_physical_grupal_context(plantel: str | None = None, periodo: str = "ul
     period_players = len({r.get("identificacion") for r in period_records if r.get("identificacion")})
     latest_records = _latest_records_by_player(records)
     group_metrics = _build_group_metrics(period_records, records, periodo)
+    perfil_antropometrico = _build_perfil_antropometrico_chart(period_records)
 
     return {
         "competitions": competitions,
@@ -268,6 +320,9 @@ def build_physical_grupal_context(plantel: str | None = None, periodo: str = "ul
         "latest_records": latest_records,
         "period_records": period_records,
         "group_metrics": group_metrics,
+        "grupal_charts": {
+            "perfil_antropometrico": perfil_antropometrico,
+        },
         "technical_summary": _build_technical_summary(group_metrics),
         "stats": {
             "total_records": total_records,
