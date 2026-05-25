@@ -568,6 +568,131 @@ def _build_individual_interpretation(kpis: list[dict[str, Any]]) -> list[dict[st
     return [by_key[key] for key in order if key in by_key]
 
 
+def _format_record_date_label(record: dict[str, Any]) -> str:
+    date_value = _coerce_date_value(record.get("fecha_medicion"))
+    if date_value is not None:
+        return date_value.strftime("%d/%m/%Y")
+    return str(record.get("fecha_medicion") or record.get("id_isak") or "")
+
+
+def _perfil_group_interpretation(group: str | None) -> str:
+    if group == "G1":
+        return "Perfil favorable, con baja adiposidad subcutanea y buena relacion musculo-osea. Compatible con una composicion corporal eficiente para el rendimiento."
+    if group == "G2":
+        return "Perfil con buena base muscular, aunque con margen de mejora en adiposidad subcutanea. El foco principal estaria en optimizar la composicion corporal sin comprometer la masa funcional."
+    if group == "G3":
+        return "Perfil ligero, con baja adiposidad pero menor desarrollo relativo en la relacion musculo-osea. Puede existir margen de mejora estructural y de fuerza."
+    if group == "G4":
+        return "Perfil menos favorable, con mayor adiposidad subcutanea y menor relacion musculo-osea relativa. El foco estaria en mejorar composicion corporal y desarrollo funcional."
+    return "Sin datos suficientes."
+
+
+def _build_individual_perfil_antropometrico_chart(
+    records: list[dict[str, Any]],
+    selected_player_id: str | None,
+) -> dict[str, Any]:
+    chart = _build_perfil_antropometrico_chart(records)
+    highlighted = None
+
+    for point in chart["points"]:
+        is_highlighted = False
+        source_id = point.get("identificacion")
+        if selected_player_id and source_id is not None:
+            is_highlighted = str(source_id) == str(selected_player_id)
+        point["highlighted"] = is_highlighted
+        if is_highlighted:
+            highlighted = point
+
+    return {
+        **chart,
+        "highlighted": highlighted,
+        "interpretation": _perfil_group_interpretation(highlighted.get("grupo") if highlighted else None)
+        #"caption": "Perfil antropometrico individual dentro del grupo, destacando la ultima medicion disponible de la jugadora.",
+    }
+
+
+def _trend_sentence(metric: str, delta: float | None) -> str | None:
+    if delta is None:
+        return None
+
+    if metric == "grasa":
+        if abs(delta) < 1:
+            return f"Estabilidad del porcentaje graso ({delta:+.1f} pp)"
+        if delta > 0:
+            label = "Ligero aumento" if abs(delta) < 2 else "Aumento marcado"
+            return f"{label} del porcentaje graso ({delta:+.1f} pp)"
+        label = "Ligera reduccion" if abs(delta) < 2 else "Reduccion marcada"
+        return f"{label} del porcentaje graso ({delta:+.1f} pp)"
+
+    if abs(delta) < 0.8:
+        return f"Estabilidad del peso corporal ({delta:+.1f} kg)"
+    if delta > 0:
+        label = "Ligero aumento" if abs(delta) < 1.5 else "Aumento marcado"
+        return f"{label} del peso corporal ({delta:+.1f} kg)"
+    label = "Ligera reduccion" if abs(delta) < 1.5 else "Reduccion marcada"
+    return f"{label} del peso corporal ({delta:+.1f} kg)"
+
+
+def _build_individual_peso_grasa_chart(player_records: list[dict[str, Any]]) -> dict[str, Any]:
+    sorted_records = _sort_records(player_records, reverse=False)
+    points = []
+
+    for record in sorted_records:
+        peso = _safe_float(record.get("peso_bruto_kg"))
+        grasa = _safe_float(record.get("ajuste_adiposa_pct"))
+        if peso is None and grasa is None:
+            continue
+        points.append(
+            {
+                "fecha": _format_record_date_label(record),
+                "peso": round(peso, 4) if peso is not None else None,
+                "grasa": round(grasa, 4) if grasa is not None else None,
+            }
+        )
+
+    valid_peso = [point["peso"] for point in points if point["peso"] is not None]
+    valid_grasa = [point["grasa"] for point in points if point["grasa"] is not None]
+    has_enough_data = len(points) >= 2 and len(valid_peso) >= 2 and len(valid_grasa) >= 2
+
+    trends = {
+        "last_vs_previous": [],
+        "first_vs_last": [],
+    }
+    if has_enough_data:
+        last = points[-1]
+        previous = points[-2]
+        first = points[0]
+        trends["last_vs_previous"] = [
+            sentence for sentence in (
+                _trend_sentence("grasa", last["grasa"] - previous["grasa"] if last["grasa"] is not None and previous["grasa"] is not None else None),
+                _trend_sentence("peso", last["peso"] - previous["peso"] if last["peso"] is not None and previous["peso"] is not None else None),
+            )
+            if sentence
+        ]
+        trends["first_vs_last"] = [
+            sentence for sentence in (
+                _trend_sentence("grasa", last["grasa"] - first["grasa"] if last["grasa"] is not None and first["grasa"] is not None else None),
+                _trend_sentence("peso", last["peso"] - first["peso"] if last["peso"] is not None and first["peso"] is not None else None),
+            )
+            if sentence
+        ]
+
+    weight_range = None
+    if valid_peso:
+        peso_min = min(valid_peso)
+        peso_max = max(valid_peso)
+        margin = max(0.5, (peso_max - peso_min) * 0.8)
+        weight_range = [round(peso_min - margin, 2), round(peso_max + margin, 2)]
+
+    return {
+        "points": points,
+        "has_enough_data": has_enough_data,
+        "weight_range": weight_range,
+        "caption": "Evolucion historica del peso corporal y del porcentaje de grasa. Permite contextualizar si los cambios de peso se acompanan de una mejora o empeoramiento de la composicion corporal.",
+        "trends": trends,
+    }
+
+
 def build_physical_individual_context(
     plantel: str | None = None,
     jugadora: str | None = None,
@@ -645,6 +770,10 @@ def build_physical_individual_context(
         player_photo_url = None
 
     individual_kpis = _build_individual_kpis(latest_record, previous_record, len(player_records))
+    individual_charts = {
+        "perfil_antropometrico": _build_individual_perfil_antropometrico_chart(records, selected_player_id),
+        "peso_grasa": _build_individual_peso_grasa_chart(player_records),
+    }
 
     return {
         "competitions": competitions,
@@ -660,6 +789,7 @@ def build_physical_individual_context(
         "latest_record": latest_record,
         "previous_record": previous_record,
         "individual_kpis": individual_kpis,
+        "individual_charts": individual_charts,
         "interpretation_rows": _build_individual_interpretation(individual_kpis),
         "reference_ranges": _reference_ranges(),
     }
@@ -732,6 +862,7 @@ def _build_perfil_antropometrico_chart(records: list[dict[str, Any]]) -> dict[st
         player_name = str(record.get("nombre_jugadora") or "").strip()
         points.append(
             {
+                "identificacion": record.get("identificacion"),
                 "jugadora": player_name,
                 "x": round(x_value, 2),
                 "y": round(y_value, 4),
