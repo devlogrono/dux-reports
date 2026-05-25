@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from dux.common.physical.queries import (
@@ -50,14 +50,27 @@ def _mean(values: list[float | None]) -> float | None:
     return sum(clean) / len(clean)
 
 
+def _coerce_date_value(value):
+    if value is None:
+        return None
+    if hasattr(value, "date"):
+        return value.date()
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value).date()
+        except ValueError:
+            return None
+    return value
+
+
 def _sort_records(records: list[dict[str, Any]], reverse: bool = True) -> list[dict[str, Any]]:
     return sorted(
         records,
         key=lambda r: (
-            r.get("fecha_medicion") is not None,
-            r.get("fecha_medicion"),
-            r.get("created_at") is not None,
-            r.get("created_at"),
+            _coerce_date_value(r.get("fecha_medicion")) is not None,
+            _coerce_date_value(r.get("fecha_medicion")),
+            _coerce_date_value(r.get("created_at")) is not None,
+            _coerce_date_value(r.get("created_at")),
             r.get("id_isak") or 0,
         ),
         reverse=reverse,
@@ -724,6 +737,244 @@ def _build_cambios_clave(records: list[dict[str, Any]], periodo: str) -> dict[st
     }
 
 
+def _record_date(record: dict[str, Any]):
+    return _coerce_date_value(record.get("fecha_medicion"))
+
+
+def _build_evolucion_temporal_chart(records: list[dict[str, Any]]) -> dict[str, Any]:
+    dated_records = []
+    for record in records:
+        fecha = _record_date(record)
+        if fecha is not None:
+            dated_records.append((fecha, record))
+
+    dated_records = sorted(dated_records, key=lambda item: item[0])
+    unique_dates = []
+    for fecha, _ in dated_records:
+        if fecha not in unique_dates:
+            unique_dates.append(fecha)
+
+    date_blocks = {}
+    current_block = 1
+    previous_date = None
+    for fecha in unique_dates:
+        if previous_date is not None and (fecha - previous_date).days > 7:
+            current_block += 1
+        date_blocks[fecha] = current_block
+        previous_date = fecha
+
+    metric_config = {
+        "ajuste_adiposa_pct": {"label": "% Grasa", "reference": {"value": 20, "label": "Limite optimo"}},
+        "ajuste_muscular_pct": {"label": "% Muscular", "reference": {"value": 40, "label": "Referencia minima"}},
+        "suma_6_pliegues_mm": {"label": "Suma 6 pliegues", "reference": {"value": 70, "label": "Limite adecuado"}},
+        "idx_musculo_oseo": {"label": "Indice musculo-oseo", "reference": {"value": 3.5, "label": "Referencia minima"}},
+        "peso_bruto_kg": {"label": "Peso", "reference": None},
+    }
+
+    metrics = {}
+    for metric, config in metric_config.items():
+        blocks: dict[int, dict[str, Any]] = {}
+        for fecha, record in dated_records:
+            value = _safe_float(record.get(metric))
+            if value is None:
+                continue
+            block_id = date_blocks[fecha]
+            block = blocks.setdefault(block_id, {"dates": [], "values": []})
+            block["dates"].append(fecha)
+            block["values"].append(value)
+
+        if len(blocks) < 2:
+            continue
+
+        points = []
+        for block_id in sorted(blocks):
+            block = blocks[block_id]
+            values = block["values"]
+            start_date = min(block["dates"])
+            end_date = max(block["dates"])
+            label = (
+                start_date.strftime("%d/%m")
+                if start_date == end_date
+                else f"{start_date.strftime('%d/%m')} - {end_date.strftime('%d/%m')}"
+            )
+            points.append(
+                {
+                    "block": block_id,
+                    "label": label,
+                    "mean": round(_mean(values) or 0, 4),
+                    "min": round(min(values), 4),
+                    "max": round(max(values), 4),
+                    "count": len(values),
+                }
+            )
+
+        if len(points) < 2:
+            continue
+
+        start_mean = points[0]["mean"]
+        end_mean = points[-1]["mean"]
+        delta_total = ((end_mean - start_mean) / start_mean) * 100 if start_mean else 0
+        metrics[metric] = {
+            "key": metric,
+            "label": config["label"],
+            "reference": config["reference"],
+            "points": points,
+            "summary": {
+                "inicio": start_mean,
+                "final": end_mean,
+                "delta_total": round(delta_total, 4),
+                "n_rondas": len(points),
+                "n_registros": sum(point["count"] for point in points),
+            },
+        }
+
+    default_metric = "ajuste_adiposa_pct" if "ajuste_adiposa_pct" in metrics else next(iter(metrics), None)
+    return {
+        "caption": "Evolucion temporal del promedio grupal por ronda de medicion, con banda de dispersion minima y maxima.",
+        "default_metric": default_metric,
+        "metrics": metrics,
+    }
+
+
+def _build_perfil_estructural_chart(records: list[dict[str, Any]]) -> dict[str, Any]:
+    plot_records = _latest_records_by_player(records)
+    raw_points = []
+
+    for record in plot_records:
+        envergadura = _safe_float(record.get("envergadura_cm"))
+        talla = _safe_float(record.get("talla_corporal_cm"))
+        muslo = _safe_float(record.get("perimetro_muslo_maximo"))
+        pantorrilla = _safe_float(record.get("perimetro_pantorrilla_maxima"))
+        if None in {envergadura, talla, muslo, pantorrilla} or talla == 0 or pantorrilla == 0:
+            continue
+
+        raw_points.append(
+            {
+                "jugadora": str(record.get("nombre_jugadora") or "").strip(),
+                "x": envergadura / talla,
+                "y": muslo / pantorrilla,
+            }
+        )
+
+    if not raw_points:
+        return {"points": [], "counts": {}, "x_cut": None, "y_cut": None, "x_range": None, "y_range": None}
+
+    x_cut = _mean([point["x"] for point in raw_points]) or 0
+    y_cut = _mean([point["y"] for point in raw_points]) or 0
+    counts = {group: 0 for group in ("G1", "G2", "G3", "G4")}
+    points = []
+
+    for point in raw_points:
+        x_value = point["x"]
+        y_value = point["y"]
+        if x_value >= x_cut and y_value >= y_cut:
+            group, color = "G1", "#2ECC71"
+        elif x_value < x_cut and y_value >= y_cut:
+            group, color = "G2", "#F1C40F"
+        elif x_value < x_cut and y_value < y_cut:
+            group, color = "G3", "#F39C12"
+        else:
+            group, color = "G4", "#E74C3C"
+
+        counts[group] += 1
+        player_name = point["jugadora"]
+        points.append(
+            {
+                "jugadora": player_name,
+                "x": round(x_value, 4),
+                "y": round(y_value, 4),
+                "grupo": group,
+                "color": color,
+                "label": f"{player_name.title()} ({x_value:.3f}; {y_value:.3f})",
+            }
+        )
+
+    x_values = [point["x"] for point in points]
+    y_values = [point["y"] for point in points]
+    x_min = min(x_values) - 0.02
+    x_max = max(x_values) + 0.02
+    y_min = min(y_values) - 0.05
+    y_max = max(y_values) + 0.05
+
+    return {
+        "points": points,
+        "counts": counts,
+        "x_cut": round(x_cut, 4),
+        "y_cut": round(y_cut, 4),
+        "x_range": [round(x_min, 4), round(x_max, 4)],
+        "y_range": [round(y_min, 4), round(y_max, 4)],
+    }
+
+
+def _build_ratios_estructurales_chart(records: list[dict[str, Any]]) -> dict[str, Any]:
+    plot_records = _latest_records_by_player(records)
+    ratio_config = {
+        "ratio_cintura_cadera": {
+            "label": "Ratio cintura / cadera",
+            "numerator": "perimetro_cintura_minima",
+            "denominator": "perimetro_cadera_maximo",
+            "reading": "Valores bajos indican menor cintura relativa respecto a la cadera. Valores altos sugieren mayor predominio central o troncal.",
+        },
+        "ratio_muslo_pantorrilla": {
+            "label": "Ratio muslo / pantorrilla",
+            "numerator": "perimetro_muslo_maximo",
+            "denominator": "perimetro_pantorrilla_maxima",
+            "reading": "Valores altos indican mayor desarrollo relativo del muslo, asociado a produccion de fuerza en tren inferior.",
+        },
+        "ratio_envergadura_talla": {
+            "label": "Ratio envergadura / talla",
+            "numerator": "envergadura_cm",
+            "denominator": "talla_corporal_cm",
+            "reading": "Valores altos indican mayor envergadura relativa, asociada a alcance, cobertura y amplitud gestual.",
+        },
+        "ratio_tronco_altura": {
+            "label": "Ratio tronco / altura",
+            "numerator": "talla_sentado_cm",
+            "denominator": "talla_corporal_cm",
+            "reading": "Valores altos indican mayor proporcion de tronco; valores bajos sugieren mayor longitud relativa de piernas.",
+        },
+    }
+
+    ratios = {}
+    for key, config in ratio_config.items():
+        points = []
+        for record in plot_records:
+            numerator = _safe_float(record.get(config["numerator"]))
+            denominator = _safe_float(record.get(config["denominator"]))
+            if numerator is None or denominator is None or denominator == 0:
+                continue
+            points.append(
+                {
+                    "jugadora": str(record.get("nombre_jugadora") or "").strip(),
+                    "value": round(numerator / denominator, 4),
+                }
+            )
+
+        if not points:
+            continue
+
+        points = sorted(points, key=lambda item: item["value"])
+        values = [point["value"] for point in points]
+        ratios[key] = {
+            "key": key,
+            "label": config["label"],
+            "points": points,
+            "summary": {
+                "mean": round(_mean(values) or 0, 4),
+                "min": min(values),
+                "max": max(values),
+            },
+            "reading": config["reading"],
+        }
+
+    default_ratio = "ratio_envergadura_talla" if "ratio_envergadura_talla" in ratios else next(iter(ratios), None)
+    return {
+        "caption": "Distribucion grupal de ratios estructurales a partir de la ultima medicion disponible de cada jugadora.",
+        "default_ratio": default_ratio,
+        "ratios": ratios,
+    }
+
+
 def build_physical_grupal_context(plantel: str | None = None, periodo: str = "ultima") -> dict[str, Any]:
     """
     Contexto de la vista grupal read-only.
@@ -749,6 +1000,11 @@ def build_physical_grupal_context(plantel: str | None = None, periodo: str = "ul
     comparison_records = records if periodo == "ultima" else period_records
     comparacion_mediciones = _build_comparacion_mediciones_chart(comparison_records, periodo)
     cambios_clave = _build_cambios_clave(comparison_records, periodo)
+    evolucion_temporal = _build_evolucion_temporal_chart(records)
+    perfil_estructural = {
+        "mapa": _build_perfil_estructural_chart(period_records),
+        "ratios": _build_ratios_estructurales_chart(period_records),
+    }
 
     return {
         "competitions": competitions,
@@ -763,6 +1019,8 @@ def build_physical_grupal_context(plantel: str | None = None, periodo: str = "ul
             "perfil_antropometrico": perfil_antropometrico,
             "distribucion_corporal": distribucion_corporal,
             "comparacion_mediciones": comparacion_mediciones,
+            "evolucion_temporal": evolucion_temporal,
+            "perfil_estructural": perfil_estructural,
         },
         "cambios_clave": cambios_clave,
         "resumen_grupal": resumen_grupal,
