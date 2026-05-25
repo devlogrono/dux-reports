@@ -528,6 +528,202 @@ def _build_resumen_grupal_table(records: list[dict[str, Any]]) -> dict[str, Any]
     }
 
 
+def _comparison_metric_config() -> dict[str, dict[str, Any]]:
+    return {
+        "peso_bruto_kg": {
+            "label": "Peso",
+            "full_label": "Peso (kg)",
+            "positive_good": None,
+        },
+        "ajuste_adiposa_pct": {
+            "label": "Grasa",
+            "full_label": "% Grasa",
+            "positive_good": False,
+        },
+        "ajuste_muscular_pct": {
+            "label": "Musculo",
+            "full_label": "% Muscular",
+            "positive_good": True,
+        },
+        "suma_6_pliegues_mm": {
+            "label": "Pliegues",
+            "full_label": "Suma 6 pliegues",
+            "positive_good": False,
+        },
+        "idx_musculo_oseo": {
+            "label": "IMO",
+            "full_label": "Indice musculo-oseo",
+            "positive_good": True,
+        },
+    }
+
+
+def _delta_color(metric: str, delta: float) -> str:
+    positive_good = _comparison_metric_config()[metric]["positive_good"]
+    if positive_good is None:
+        return "#4A6FBF"
+    if delta == 0:
+        return "#7F8C8D"
+    is_good = delta > 0 if positive_good else delta < 0
+    return "#2ECC71" if is_good else "#E74C3C"
+
+
+def _player_comparison_pairs(records: list[dict[str, Any]], periodo: str) -> list[dict[str, Any]]:
+    records_by_player: dict[Any, list[dict[str, Any]]] = {}
+    for record in records:
+        player_id = record.get("identificacion") or record.get("nombre_jugadora")
+        if record.get("fecha_medicion") is not None and player_id:
+            records_by_player.setdefault(player_id, []).append(record)
+
+    pairs = []
+    for player_records in records_by_player.values():
+        sorted_records = _sort_records(player_records, reverse=True)
+        if len(sorted_records) < 2:
+            continue
+
+        current = sorted_records[0]
+        previous = sorted_records[1] if periodo == "ultima" else _sort_records(player_records, reverse=False)[0]
+
+        if current.get("id_isak") == previous.get("id_isak"):
+            continue
+
+        pairs.append(
+            {
+                "identificacion": current.get("identificacion"),
+                "nombre_jugadora": current.get("nombre_jugadora") or previous.get("nombre_jugadora"),
+                "current": current,
+                "previous": previous,
+            }
+        )
+
+    return pairs
+
+
+def _metric_delta_from_pairs(pairs: list[dict[str, Any]], metric: str) -> dict[str, Any] | None:
+    comparable = []
+    for pair in pairs:
+        prev_value = _safe_float(pair["previous"].get(metric))
+        curr_value = _safe_float(pair["current"].get(metric))
+        if prev_value is None or curr_value is None:
+            continue
+        comparable.append((prev_value, curr_value))
+
+    if not comparable:
+        return None
+
+    prev_mean = _mean([prev for prev, _ in comparable])
+    curr_mean = _mean([curr for _, curr in comparable])
+    if prev_mean is None or curr_mean is None or prev_mean == 0:
+        delta_pct = 0
+    else:
+        delta_pct = ((curr_mean - prev_mean) / prev_mean) * 100
+
+    return {
+        "previous_mean": prev_mean,
+        "current_mean": curr_mean,
+        "delta_pct": delta_pct,
+        "n": len(comparable),
+    }
+
+
+def _build_comparacion_mediciones_chart(records: list[dict[str, Any]], periodo: str) -> dict[str, Any]:
+    pairs = _player_comparison_pairs(records, periodo)
+    metrics = []
+
+    for metric, config in _comparison_metric_config().items():
+        delta = _metric_delta_from_pairs(pairs, metric)
+        if delta is None:
+            continue
+
+        metrics.append(
+            {
+                "key": metric,
+                "label": config["label"],
+                "full_label": config["full_label"],
+                "delta_pct": round(delta["delta_pct"], 4),
+                "previous_mean": delta["previous_mean"],
+                "current_mean": delta["current_mean"],
+                "n": delta["n"],
+                "color": _delta_color(metric, delta["delta_pct"]),
+                "positive_good": config["positive_good"],
+            }
+        )
+
+    values = [metric["delta_pct"] for metric in metrics]
+    max_abs = max([abs(value) for value in values], default=1)
+    padding = max(max_abs * 0.15, 1)
+
+    return {
+        "metrics": metrics,
+        "n_players": len(pairs),
+        "caption": (
+            "La grafica muestra el cambio porcentual promedio del grupo entre la ultima y la medicion anterior."
+            if periodo == "ultima"
+            else "La grafica muestra el cambio porcentual promedio del grupo entre la primera y la ultima medicion del periodo."
+        ),
+        "y_range": [round(min(values, default=0) - padding, 2), round(max(values, default=0) + padding, 2)],
+        "axis_title": (
+            "Cambio (%) respecto a la medicion anterior"
+            if periodo == "ultima"
+            else "Cambio (%) respecto al inicio del periodo"
+        ),
+    }
+
+
+def _build_cambios_clave(records: list[dict[str, Any]], periodo: str) -> dict[str, Any]:
+    pairs = _player_comparison_pairs(records, periodo)
+    metrics: dict[str, Any] = {}
+
+    for metric, config in _comparison_metric_config().items():
+        rows = []
+        for pair in pairs:
+            prev_value = _safe_float(pair["previous"].get(metric))
+            curr_value = _safe_float(pair["current"].get(metric))
+            if prev_value is None or curr_value is None or prev_value == 0:
+                continue
+
+            delta_pct = ((curr_value - prev_value) / prev_value) * 100
+            delta_abs = curr_value - prev_value
+            positive_good = config["positive_good"]
+            if positive_good is None:
+                score = abs(delta_pct)
+            else:
+                score = delta_pct if positive_good else -delta_pct
+
+            rows.append(
+                {
+                    "jugadora": str(pair.get("nombre_jugadora") or pair.get("identificacion") or ""),
+                    "valor_inicial": round(prev_value, 4),
+                    "valor_final": round(curr_value, 4),
+                    "delta_pct": round(delta_pct, 4),
+                    "delta_abs": round(delta_abs, 4),
+                    "score_mejora": round(score, 4),
+                }
+            )
+
+        if not rows:
+            continue
+
+        top_mejora = sorted(rows, key=lambda row: (-row["score_mejora"], row["jugadora"]))
+        top_empeora = sorted(rows, key=lambda row: (row["score_mejora"], row["jugadora"]))
+
+        metrics[metric] = {
+            "key": metric,
+            "label": config["full_label"],
+            "positive_good": config["positive_good"],
+            "rows": rows,
+            "top_mejora": top_mejora[:10],
+            "top_empeora": top_empeora[:10],
+        }
+
+    default_metric = "ajuste_adiposa_pct" if "ajuste_adiposa_pct" in metrics else next(iter(metrics), None)
+    return {
+        "caption": "Ranking de jugadoras con mayor mejora y mayor empeoramiento segun la metrica seleccionada.",
+        "default_metric": default_metric,
+        "metrics": metrics,
+    }
+
+
 def build_physical_grupal_context(plantel: str | None = None, periodo: str = "ultima") -> dict[str, Any]:
     """
     Contexto de la vista grupal read-only.
@@ -550,6 +746,9 @@ def build_physical_grupal_context(plantel: str | None = None, periodo: str = "ul
     perfil_antropometrico = _build_perfil_antropometrico_chart(period_records)
     distribucion_corporal = _build_distribucion_corporal_chart(period_records)
     resumen_grupal = _build_resumen_grupal_table(period_records)
+    comparison_records = records if periodo == "ultima" else period_records
+    comparacion_mediciones = _build_comparacion_mediciones_chart(comparison_records, periodo)
+    cambios_clave = _build_cambios_clave(comparison_records, periodo)
 
     return {
         "competitions": competitions,
@@ -563,7 +762,9 @@ def build_physical_grupal_context(plantel: str | None = None, periodo: str = "ul
         "grupal_charts": {
             "perfil_antropometrico": perfil_antropometrico,
             "distribucion_corporal": distribucion_corporal,
+            "comparacion_mediciones": comparacion_mediciones,
         },
+        "cambios_clave": cambios_clave,
         "resumen_grupal": resumen_grupal,
         "technical_summary": _build_technical_summary(group_metrics),
         "stats": {
