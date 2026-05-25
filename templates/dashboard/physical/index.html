@@ -39,6 +39,26 @@
     font-weight: 700;
     color: #111827;
   }
+
+  .alert-card {
+    border: 0;
+    border-radius: 1rem;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.10);
+    height: 100%;
+  }
+
+  .alert-card-danger {
+    border-left: 5px solid #dc3545;
+  }
+
+  .alert-card-success {
+    border-left: 5px solid #198754;
+  }
+
+  .alert-delta {
+    font-size: .82rem;
+    font-weight: 700;
+  }
 </style>
 {% endblock %}
 
@@ -114,6 +134,72 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <div class="physical-card p-4 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+      <div>
+        <h4 class="section-title mb-1">Alertas</h4>
+        <p class="text-muted mb-0">
+          Basado en la ultima medicion disponible de cada jugadora y su comparacion con la anterior.
+        </p>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      {% for card in alert_cards %}
+        <div class="col-12 col-md-6 col-xl">
+          <div class="card alert-card alert-card-{{ card.tone }}">
+            <div class="card-body">
+              <div class="kpi-label">{{ card.title }}</div>
+              <div class="kpi-value">{{ card.value }}</div>
+              {% if card.delta is not none %}
+                <div class="alert-delta text-{% if card.delta > 0 %}danger{% elif card.delta < 0 %}success{% else %}muted{% endif %}">
+                  {{ "%+d"|format(card.delta) }} vs medicion anterior
+                </div>
+              {% else %}
+                <div class="small text-muted">Comparativa ultima vs anterior</div>
+              {% endif %}
+              <div class="small text-muted mt-2">{{ card.help }}</div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if recent_worsening_rows %}
+      <h5 class="section-title mb-3">Jugadoras en empeoramiento reciente</h5>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Jugadora</th>
+              <th>N metricas empeoradas</th>
+              <th>Grasa</th>
+              <th>Musculo</th>
+              <th>Pliegues</th>
+              <th>IMO</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in recent_worsening_rows %}
+              <tr>
+                <td>{{ row.jugadora }}</td>
+                <td>{{ row.n_metricas }}</td>
+                <td>{% if row.grasa %}<span class="text-danger fw-semibold">{{ row.grasa }}</span>{% else %}-{% endif %}</td>
+                <td>{% if row.musculo %}<span class="text-danger fw-semibold">{{ row.musculo }}</span>{% else %}-{% endif %}</td>
+                <td>{% if row.pliegues %}<span class="text-danger fw-semibold">{{ row.pliegues }}</span>{% else %}-{% endif %}</td>
+                <td>{% if row.imo %}<span class="text-danger fw-semibold">{{ row.imo }}</span>{% else %}-{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-success mb-0">
+        No hay jugadoras con empeoramiento reciente.
+      </div>
+    {% endif %}
   </div>
 
   <div class="physical-card p-4">

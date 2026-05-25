@@ -19,6 +19,9 @@ def build_physical_index_context(plantel: str | None = None) -> dict[str, Any]:
     competitions = get_physical_competitions()
     stats = get_physical_overview_stats(plantel=plantel)
     recent_records = get_physical_records(plantel=plantel, limit=15)
+    raw_records = get_physical_full_records(plantel=plantel)
+    records = [build_record_antropometrico(record) for record in raw_records]
+    alert_summary = _build_inicio_alerts(records)
 
     selected_competition = None
     if plantel:
@@ -33,6 +36,9 @@ def build_physical_index_context(plantel: str | None = None) -> dict[str, Any]:
         "selected_competition": selected_competition,
         "stats": stats,
         "recent_records": recent_records,
+        "alert_summary": alert_summary,
+        "alert_cards": alert_summary["cards"],
+        "recent_worsening_rows": alert_summary["worsening_rows"],
     }
 
 
@@ -86,6 +92,152 @@ def _latest_records_by_player(records: list[dict[str, Any]]) -> list[dict[str, A
             latest_by_player[player_id] = record
 
     return list(latest_by_player.values())
+
+
+def _count_alert(records: list[dict[str, Any]], metric: str, threshold: float, operator: str) -> int:
+    total = 0
+    for record in records:
+        value = _safe_float(record.get(metric))
+        if value is None:
+            continue
+        if operator == "gt" and value > threshold:
+            total += 1
+        elif operator == "lt" and value < threshold:
+            total += 1
+    return total
+
+
+def _worsening_changes(current: dict[str, Any], previous: dict[str, Any]) -> dict[str, str]:
+    changes = {}
+
+    grasa_curr = _safe_float(current.get("ajuste_adiposa_pct"))
+    grasa_prev = _safe_float(previous.get("ajuste_adiposa_pct"))
+    if grasa_curr is not None and grasa_prev is not None and grasa_curr > grasa_prev:
+        changes["grasa"] = f"+{grasa_curr - grasa_prev:.1f}"
+
+    musculo_curr = _safe_float(current.get("ajuste_muscular_pct"))
+    musculo_prev = _safe_float(previous.get("ajuste_muscular_pct"))
+    if musculo_curr is not None and musculo_prev is not None and musculo_curr < musculo_prev:
+        changes["musculo"] = f"{musculo_curr - musculo_prev:.1f}"
+
+    pliegues_curr = _safe_float(current.get("suma_6_pliegues_mm"))
+    pliegues_prev = _safe_float(previous.get("suma_6_pliegues_mm"))
+    if pliegues_curr is not None and pliegues_prev is not None and pliegues_curr > pliegues_prev:
+        changes["pliegues"] = f"+{pliegues_curr - pliegues_prev:.1f}"
+
+    imo_curr = _safe_float(current.get("idx_musculo_oseo"))
+    imo_prev = _safe_float(previous.get("idx_musculo_oseo"))
+    if imo_curr is not None and imo_prev is not None and imo_curr < imo_prev:
+        changes["imo"] = f"{imo_curr - imo_prev:.2f}"
+
+    return changes
+
+
+def _build_inicio_alerts(records: list[dict[str, Any]]) -> dict[str, Any]:
+    latest_records = _latest_records_by_player(records)
+    pairs = _player_comparison_pairs(records, "ultima")
+    previous_records = [pair["previous"] for pair in pairs]
+
+    alert_defs = [
+        {
+            "key": "grasa_elevada",
+            "title": "Grasa elevada",
+            "help": "Jugadoras con porcentaje de grasa superior a 24%.",
+            "metric": "ajuste_adiposa_pct",
+            "threshold": 24,
+            "operator": "gt",
+        },
+        {
+            "key": "musculo_bajo",
+            "title": "Musculo bajo",
+            "help": "Jugadoras con porcentaje muscular inferior a 40%.",
+            "metric": "ajuste_muscular_pct",
+            "threshold": 40,
+            "operator": "lt",
+        },
+        {
+            "key": "pliegues_elevados",
+            "title": "Pliegues elevados",
+            "help": "Jugadoras con suma de 6 pliegues superior a 90 mm.",
+            "metric": "suma_6_pliegues_mm",
+            "threshold": 90,
+            "operator": "gt",
+        },
+        {
+            "key": "imo_mejorable",
+            "title": "IMO mejorable",
+            "help": "Jugadoras con indice musculo / oseo inferior a 3.5.",
+            "metric": "idx_musculo_oseo",
+            "threshold": 3.5,
+            "operator": "lt",
+        },
+    ]
+
+    cards = []
+    for alert in alert_defs:
+        current_count = _count_alert(
+            latest_records,
+            alert["metric"],
+            alert["threshold"],
+            alert["operator"],
+        )
+        previous_count = _count_alert(
+            previous_records,
+            alert["metric"],
+            alert["threshold"],
+            alert["operator"],
+        )
+        delta = current_count - previous_count
+        cards.append(
+            {
+                "key": alert["key"],
+                "title": alert["title"],
+                "value": current_count,
+                "delta": delta,
+                "help": alert["help"],
+                "tone": "danger" if current_count else "success",
+            }
+        )
+
+    worsening_rows = []
+    for pair in pairs:
+        changes = _worsening_changes(pair["current"], pair["previous"])
+        if not changes:
+            continue
+        worsening_rows.append(
+            {
+                "identificacion": pair.get("identificacion"),
+                "jugadora": pair.get("nombre_jugadora") or pair.get("identificacion") or "",
+                "n_metricas": len(changes),
+                "grasa": changes.get("grasa"),
+                "musculo": changes.get("musculo"),
+                "pliegues": changes.get("pliegues"),
+                "imo": changes.get("imo"),
+            }
+        )
+
+    worsening_rows = sorted(
+        worsening_rows,
+        key=lambda row: (-row["n_metricas"], str(row["jugadora"])),
+    )
+
+    cards.append(
+        {
+            "key": "empeoramiento_reciente",
+            "title": "Empeoramientos",
+            "value": len(worsening_rows),
+            "delta": None,
+            "help": "Jugadoras cuya ultima medicion empeora respecto a la anterior en alguna variable clave.",
+            "tone": "danger" if worsening_rows else "success",
+        }
+    )
+
+    return {
+        "cards": cards,
+        "worsening_rows": worsening_rows,
+        "latest_players": len(latest_records),
+        "players_with_previous": len(pairs),
+    }
 
 
 def _records_from_last_months(records: list[dict[str, Any]], months: int = 6) -> list[dict[str, Any]]:
