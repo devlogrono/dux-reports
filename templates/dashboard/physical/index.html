@@ -211,7 +211,7 @@
 
       <div class="d-flex gap-2">
         <a class="btn btn-outline-primary btn-sm" href="{{ url_for('dashboard_physical.grupal', plantel=plantel) }}">Grupal</a>
-        <a class="btn btn-outline-primary btn-sm disabled" href="#">Individual</a>
+        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('dashboard_physical.individual', plantel=plantel) }}">Individual</a>
         <a class="btn btn-outline-secondary btn-sm disabled" href="#">Registro</a>
       </div>
     </div>

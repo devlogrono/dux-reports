@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 from typing import Any
 
+from sqlalchemy import text
+
+from dux import db
 from dux.common.physical.queries import (
     get_physical_competitions,
     get_physical_full_records,
     get_physical_overview_stats,
+    get_physical_players,
     get_physical_records,
 )
 from dux.common.physical.transforms import build_record_antropometrico
@@ -69,6 +74,63 @@ def _coerce_date_value(value):
     return value
 
 
+def _calculate_age(value) -> int | None:
+    birth_date = _coerce_date_value(value)
+    if birth_date is None:
+        return None
+    today = datetime.today().date()
+    return today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+
+
+def normalize_player_photo_url(foto_url=None, foto_url_drive=None) -> str | None:
+    def normalize(value) -> str | None:
+        if value is None:
+            return None
+        url = str(value).strip()
+        if not url or url.lower() in {"no disponible", "none", "null", "nan", "-"}:
+            return None
+
+        drive_match = re.search(r"drive\.google\.com/file/d/([^/]+)", url)
+        if drive_match:
+            return f"https://drive.google.com/uc?export=view&id={drive_match.group(1)}"
+
+        drive_id_match = re.search(r"[?&]id=([^&]+)", url)
+        if "drive.google.com" in url and drive_id_match:
+            return f"https://drive.google.com/uc?export=view&id={drive_id_match.group(1)}"
+
+        if re.fullmatch(r"[-\w]{20,}", url):
+            return f"https://drive.google.com/uc?export=view&id={url}"
+
+        return url
+
+    direct_url = normalize(foto_url)
+    if direct_url:
+        return direct_url
+    return normalize(foto_url_drive)
+
+
+def _clean_image_url(value) -> str | None:
+    if not value:
+        return None
+    return normalize_player_photo_url(foto_url=value)
+
+
+def get_physical_player_photo_sources(identificacion: str) -> dict[str, Any]:
+    """
+    Lee las URLs de foto de informacion_futbolistas para servirlas desde backend.
+    """
+    sql = text(
+        """
+        SELECT foto_url, foto_url_drive
+        FROM informacion_futbolistas
+        WHERE identificacion = :identificacion
+        LIMIT 1;
+        """
+    )
+    row = db.session.execute(sql, {"identificacion": identificacion}).mappings().first()
+    return dict(row) if row else {}
+
+
 def _sort_records(records: list[dict[str, Any]], reverse: bool = True) -> list[dict[str, Any]]:
     return sorted(
         records,
@@ -92,6 +154,38 @@ def _latest_records_by_player(records: list[dict[str, Any]]) -> list[dict[str, A
             latest_by_player[player_id] = record
 
     return list(latest_by_player.values())
+
+
+def _records_by_player(records: list[dict[str, Any]]) -> dict[Any, list[dict[str, Any]]]:
+    records_by_player: dict[Any, list[dict[str, Any]]] = {}
+    for record in records:
+        player_id = record.get("identificacion") or record.get("nombre_jugadora")
+        if player_id:
+            records_by_player.setdefault(player_id, []).append(record)
+    return records_by_player
+
+
+def _player_options_from_records(
+    records: list[dict[str, Any]],
+    player_info_by_id: dict[str, dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    player_info_by_id = player_info_by_id or {}
+    options = []
+    for record in _latest_records_by_player(records):
+        player_id = record.get("identificacion") or record.get("nombre_jugadora")
+        if not player_id:
+            continue
+        info = player_info_by_id.get(str(player_id), {})
+        options.append(
+            {
+                "id": str(player_id),
+                "nombre": str(info.get("nombre_jugadora") or record.get("nombre_jugadora") or player_id).strip(),
+                "plantel": info.get("plantel") or record.get("plantel"),
+                "fecha_ultima": record.get("fecha_medicion"),
+            }
+        )
+
+    return sorted(options, key=lambda item: item["nombre"])
 
 
 def _count_alert(records: list[dict[str, Any]], metric: str, threshold: float, operator: str) -> int:
@@ -241,14 +335,14 @@ def _build_inicio_alerts(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _records_from_last_months(records: list[dict[str, Any]], months: int = 6) -> list[dict[str, Any]]:
-    dated_records = [r for r in records if r.get("fecha_medicion") is not None]
+    dated_records = [r for r in records if _coerce_date_value(r.get("fecha_medicion")) is not None]
     if not dated_records:
         return []
 
-    max_date = max(r["fecha_medicion"] for r in dated_records)
+    max_date = max(_coerce_date_value(r["fecha_medicion"]) for r in dated_records)
     limit_date = max_date - timedelta(days=months * 30)
 
-    return [r for r in dated_records if r["fecha_medicion"] >= limit_date]
+    return [r for r in dated_records if _coerce_date_value(r["fecha_medicion"]) >= limit_date]
 
 
 def _period_records(records: list[dict[str, Any]], periodo: str) -> tuple[list[dict[str, Any]], str]:
@@ -402,6 +496,173 @@ def _reference_ranges() -> list[dict[str, Any]]:
             ],
         },
     ]
+
+
+def _individual_metric_config() -> list[dict[str, Any]]:
+    return [
+        {"key": "peso", "source": "peso_bruto_kg", "label": "Peso", "unit": "kg", "decimals": 1},
+        {"key": "talla", "source": "talla_corporal_cm", "label": "Talla", "unit": "cm", "decimals": 1},
+        {"key": "grasa", "source": "ajuste_adiposa_pct", "label": "% Grasa", "unit": "%", "decimals": 1},
+        {"key": "musculo", "source": "ajuste_muscular_pct", "label": "% Muscular", "unit": "%", "decimals": 1},
+        {"key": "imo", "source": "idx_musculo_oseo", "label": "Indice M/O", "unit": "", "decimals": 2},
+        {"key": "pliegues", "source": "suma_6_pliegues_mm", "label": "Suma 6 pliegues", "unit": "mm", "decimals": 1},
+        {"key": "masa_osea", "source": "masa_osea_kg", "label": "Masa osea", "unit": "kg", "decimals": 1},
+        {"key": "n_mediciones", "source": None, "label": "N mediciones", "unit": "", "decimals": 0},
+    ]
+
+
+def _metric_delta_pct(current_value: float | None, previous_value: float | None) -> float | None:
+    if current_value is None or previous_value is None or previous_value == 0:
+        return None
+    return ((current_value - previous_value) / previous_value) * 100
+
+
+def _individual_metric_status(metric_key: str, value: float | None) -> tuple[str, str, str]:
+    if metric_key in {"peso", "talla", "masa_osea", "n_mediciones"}:
+        if value is None:
+            return "Sin datos", "secondary", "No hay datos suficientes para valorar esta metrica."
+        return "Descriptivo", "secondary", "Variable descriptiva; interpretar en contexto individual y evolutivo."
+
+    status_map = {
+        "grasa": "grasa_media",
+        "musculo": "musculo_medio",
+        "imo": "imo_medio",
+        "pliegues": "pliegues_media",
+    }
+    return _metric_status(status_map.get(metric_key, metric_key), value)
+
+
+def _build_individual_kpis(
+    latest_record: dict[str, Any] | None,
+    previous_record: dict[str, Any] | None,
+    total_measurements: int = 0,
+) -> list[dict[str, Any]]:
+    kpis = []
+    for config in _individual_metric_config():
+        if config["key"] == "n_mediciones":
+            current_value = float(total_measurements)
+            previous_value = None
+            delta = None
+        else:
+            current_value = _safe_float(latest_record.get(config["source"])) if latest_record else None
+            previous_value = _safe_float(previous_record.get(config["source"])) if previous_record else None
+            delta = _metric_delta_pct(current_value, previous_value)
+        status, status_class, interpretation = _individual_metric_status(config["key"], current_value)
+        kpis.append(
+            {
+                **config,
+                "value": current_value,
+                "previous_value": previous_value,
+                "delta_pct": delta,
+                "status": status,
+                "status_class": status_class,
+                "interpretation": interpretation,
+            }
+        )
+    return kpis
+
+
+def _build_individual_interpretation(kpis: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    order = ["peso", "talla", "masa_osea", "grasa", "musculo", "pliegues", "imo"]
+    by_key = {metric["key"]: metric for metric in kpis}
+    return [by_key[key] for key in order if key in by_key]
+
+
+def build_physical_individual_context(
+    plantel: str | None = None,
+    jugadora: str | None = None,
+    periodo: str = "ultima",
+) -> dict[str, Any]:
+    """
+    Contexto read-only de la primera vista individual de Physical.
+    """
+    if periodo not in {"ultima", "historico"}:
+        periodo = "ultima"
+
+    competitions = get_physical_competitions()
+    player_info = get_physical_players(plantel=plantel)
+    player_info_by_id = {
+        str(player.get("identificacion")): player
+        for player in player_info
+        if player.get("identificacion")
+    }
+    raw_records = get_physical_full_records(plantel=plantel)
+    records = [build_record_antropometrico(record) for record in raw_records]
+    players = _player_options_from_records(records, player_info_by_id)
+
+    selected_player_id = str(jugadora) if jugadora else (players[0]["id"] if players else None)
+    if selected_player_id and players and selected_player_id not in {player["id"] for player in players}:
+        selected_player_id = players[0]["id"]
+
+    records_by_player = _records_by_player(records)
+    player_records = records_by_player.get(selected_player_id, []) if selected_player_id else []
+
+    if not player_records and selected_player_id is not None:
+        for player_id, candidate_records in records_by_player.items():
+            if str(player_id) == selected_player_id:
+                player_records = candidate_records
+                selected_player_id = str(player_id)
+                break
+
+    player_records = _sort_records(player_records, reverse=True)
+    latest_record = player_records[0] if player_records else None
+    previous_record = player_records[1] if len(player_records) > 1 else None
+    period_records = _records_from_last_months(player_records) if periodo == "historico" else ([latest_record] if latest_record else [])
+
+    selected_player = None
+    if selected_player_id:
+        selected_player = next(
+            (player for player in players if player["id"] == str(selected_player_id)),
+            None,
+        )
+
+    selected_player_info = player_info_by_id.get(str(selected_player_id), {}) if selected_player_id else {}
+    if selected_player is None and latest_record:
+        selected_player = {
+            "id": str(latest_record.get("identificacion") or latest_record.get("nombre_jugadora")),
+            "nombre": str(latest_record.get("nombre_jugadora") or "").strip(),
+            "plantel": latest_record.get("plantel"),
+            "fecha_ultima": latest_record.get("fecha_medicion"),
+        }
+
+    if selected_player:
+        player_photo_url = normalize_player_photo_url(
+            foto_url=selected_player_info.get("foto_url"),
+            foto_url_drive=selected_player_info.get("foto_url_drive"),
+        )
+        selected_player = {
+            **selected_player,
+            "dorsal": selected_player_info.get("dorsal"),
+            "nacionalidad": selected_player_info.get("nacionalidad"),
+            "posicion": selected_player_info.get("posicion"),
+            "fecha_nacimiento": selected_player_info.get("fecha_nacimiento"),
+            "edad": _calculate_age(selected_player_info.get("fecha_nacimiento")),
+            "foto_url": _clean_image_url(selected_player_info.get("foto_url")),
+            "foto_url_drive": _clean_image_url(selected_player_info.get("foto_url_drive")),
+            "player_photo_url": player_photo_url,
+        }
+    else:
+        player_photo_url = None
+
+    individual_kpis = _build_individual_kpis(latest_record, previous_record, len(player_records))
+
+    return {
+        "competitions": competitions,
+        "plantel": plantel,
+        "periodo": periodo,
+        "period_label": "ultimos 6 meses" if periodo == "historico" else "ultima medicion",
+        "players": players,
+        "selected_player_id": selected_player_id,
+        "selected_player": selected_player,
+        "player_photo_url": player_photo_url,
+        "player_records": player_records,
+        "period_records": period_records,
+        "latest_record": latest_record,
+        "previous_record": previous_record,
+        "individual_kpis": individual_kpis,
+        "interpretation_rows": _build_individual_interpretation(individual_kpis),
+        "reference_ranges": _reference_ranges(),
+    }
 
 
 def _build_group_metrics(

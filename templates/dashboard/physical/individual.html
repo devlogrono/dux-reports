@@ -1,0 +1,417 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Physical - Individual{% endblock %}
+
+{% block extra_css %}
+<style>
+  .physical-card {
+    background: rgba(255,255,255,.94);
+    border-radius: 1rem;
+    box-shadow: 0 10px 30px rgba(15,23,42,.16);
+  }
+
+  .kpi-card {
+    border: 0;
+    border-radius: 1rem;
+    box-shadow: 0 8px 20px rgba(15,23,42,.10);
+    height: 100%;
+  }
+
+  .kpi-label {
+    font-size: .76rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  .kpi-value {
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .kpi-delta {
+    font-size: .85rem;
+    font-weight: 600;
+  }
+
+  .section-title {
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .player-photo,
+  .player-avatar {
+    width: 150px;
+    height: 150px;
+    border-radius: .75rem;
+  }
+
+  .player-photo {
+    object-fit: cover;
+    background: #f1f5f9;
+  }
+
+  .player-avatar {
+    display: grid;
+    place-items: center;
+    background: #f1f5f9;
+    color: #0f172a;
+    font-size: 3rem;
+    font-weight: 800;
+  }
+
+  .physical-tabs .nav-link {
+    color: #495057;
+    font-weight: 600;
+  }
+
+  .physical-tabs .nav-link.active {
+    color: #0d6efd;
+  }
+
+  .status-badge {
+    font-weight: 700;
+  }
+
+  .status-success {
+    background-color: #2ECC71 !important;
+    color: #fff !important;
+  }
+
+  .status-excellent {
+    background-color: #0F766E !important;
+    color: #fff !important;
+    border: 1px solid rgba(13, 148, 136, .55);
+  }
+
+  .status-excellent::before {
+    content: "★ ";
+  }
+
+  .status-warning {
+    background-color: #F39C12 !important;
+    color: #fff !important;
+  }
+
+  .status-danger {
+    background-color: #E74C3C !important;
+    color: #fff !important;
+  }
+
+  .status-secondary {
+    background-color: #6c757d !important;
+    color: #fff !important;
+  }
+</style>
+{% endblock %}
+
+{% macro fmt_value(value, decimals=1, unit='') -%}
+  {%- if value is none -%}
+    -
+  {%- elif decimals == 0 -%}
+    {{ "%.0f"|format(value) }}{% if unit %} {{ unit }}{% endif %}
+  {%- elif decimals == 2 -%}
+    {{ "%.2f"|format(value) }}{% if unit %} {{ unit }}{% endif %}
+  {%- else -%}
+    {{ "%.1f"|format(value) }}{% if unit %} {{ unit }}{% endif %}
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro fmt_delta(value) -%}
+  {%- if value is none -%}
+    Sin comparativa
+  {%- else -%}
+    {{ "%+.2f"|format(value) }}%
+  {%- endif -%}
+{%- endmacro %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <div class="physical-card p-4 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+      <div>
+        <h1 class="section-title mb-1">Physical - Analisis individual</h1>
+        <p class="text-muted mb-0">
+          Vista individual read-only de registros antropometricos ISAK.
+        </p>
+      </div>
+
+      <form method="get" class="d-flex flex-wrap gap-2 align-items-end">
+        <input type="hidden" name="periodo" value="{{ periodo }}">
+        <div>
+          <label for="plantel" class="form-label small text-muted mb-1">Plantel</label>
+          <select id="plantel" name="plantel" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">Todos</option>
+            {% for c in competitions %}
+              <option value="{{ c.codigo }}" {% if plantel == c.codigo|string %}selected{% endif %}>
+                {{ c.nombre }}{% if c.codigo %} ({{ c.codigo }}){% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label for="jugadora" class="form-label small text-muted mb-1">Jugadora</label>
+          <select id="jugadora" name="jugadora" class="form-select form-select-sm" onchange="this.form.submit()">
+            {% if not players %}
+              <option value="">Sin registros</option>
+            {% endif %}
+            {% for player in players %}
+              <option value="{{ player.id }}" {% if player.id == selected_player_id|string %}selected{% endif %}>
+                {{ player.nombre }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {% if plantel or selected_player_id %}
+          <a href="{{ url_for('dashboard_physical.individual') }}" class="btn btn-outline-secondary btn-sm">
+            Limpiar
+          </a>
+        {% endif %}
+
+        <a href="{{ url_for('dashboard_physical.grupal', plantel=plantel) }}" class="btn btn-outline-primary btn-sm">
+          Grupal
+        </a>
+        <a href="{{ url_for('dashboard_physical.index') }}" class="btn btn-outline-primary btn-sm">
+          Inicio Physical
+        </a>
+      </form>
+    </div>
+  </div>
+
+  {% if selected_player and latest_record %}
+    <div class="physical-card p-3 mb-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+          <div class="kpi-label">Periodo</div>
+          <div class="fw-semibold text-dark">{{ period_label|capitalize }}</div>
+          <div class="text-muted small">
+            {{ period_records|length }} registros en el calculo.
+          </div>
+        </div>
+        <div class="btn-group" role="group" aria-label="Periodo">
+          <a
+            class="btn btn-sm {% if periodo == 'ultima' %}btn-primary{% else %}btn-outline-primary{% endif %}"
+            href="{{ url_for('dashboard_physical.individual', plantel=plantel, jugadora=selected_player_id, periodo='ultima') }}"
+          >
+            Ultima medicion
+          </a>
+          <a
+            class="btn btn-sm {% if periodo == 'historico' %}btn-primary{% else %}btn-outline-primary{% endif %}"
+            href="{{ url_for('dashboard_physical.individual', plantel=plantel, jugadora=selected_player_id, periodo='historico') }}"
+          >
+            Ultimos 6 meses
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="physical-card p-4 mb-4">
+      <div class="row g-4 align-items-center">
+        <div class="col-12 col-md-auto">
+          {% if selected_player.id %}
+            <img
+              class="player-photo"
+              src="{{ url_for('dashboard_physical.player_photo', identificacion=selected_player.id) }}"
+              alt="{{ selected_player.nombre }}"
+              onerror="this.classList.add('d-none'); this.nextElementSibling.classList.remove('d-none');"
+            >
+            <div class="player-avatar d-none">{{ (selected_player.nombre[:1] or "?")|upper }}</div>
+          {% else %}
+            <div class="player-avatar">{{ (selected_player.nombre[:1] or "?")|upper }}</div>
+          {% endif %}
+        </div>
+        <div class="col-12 col-md">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <h2 class="section-title mb-0">{{ selected_player.nombre }}</h2>
+            {% if selected_player.dorsal %}
+              <span class="badge text-bg-danger">Dorsal #{{ selected_player.dorsal }}</span>
+            {% endif %}
+          </div>
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
+              <div class="kpi-label">Identificacion</div>
+              <div class="fw-semibold">{{ selected_player.id }}</div>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="kpi-label">Pais</div>
+              <div class="fw-semibold">{{ selected_player.nacionalidad or "-" }}</div>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="kpi-label">Plantel</div>
+              <div class="fw-semibold">{{ selected_player.plantel or "-" }}</div>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="kpi-label">Posicion</div>
+              <div class="fw-semibold">{{ selected_player.posicion or "-" }}</div>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="kpi-label">Fecha nacimiento</div>
+              <div class="fw-semibold">{{ selected_player.fecha_nacimiento or "-" }}</div>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="kpi-label">Edad</div>
+              <div class="fw-semibold">{% if selected_player.edad is not none %}{{ selected_player.edad }} anos{% else %}-{% endif %}</div>
+            </div>
+          </div>
+          <div class="small text-muted mt-3">
+            Ultima medicion: {{ latest_record.fecha_medicion or "-" }}
+            {% if previous_record %}
+              · Comparada contra {{ previous_record.fecha_medicion or "-" }}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      {% for metric in individual_kpis %}
+        <div class="col-12 col-md-6 col-xl-3">
+          <div class="card kpi-card">
+            <div class="card-body">
+              <div class="kpi-label">{{ metric.label }}</div>
+              <div class="kpi-value">{{ fmt_value(metric.value, metric.decimals, metric.unit) }}</div>
+              <div class="kpi-delta text-{% if metric.delta_pct is none %}muted{% elif metric.delta_pct < 0 %}danger{% else %}success{% endif %}">
+                {{ fmt_delta(metric.delta_pct) }}
+              </div>
+              <div class="small text-muted">vs medicion anterior</div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="physical-card p-4 mb-4">
+      <h4 class="section-title mb-3">Interpretacion de metricas</h4>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Metrica</th>
+              <th>Valor</th>
+              <th>Estado</th>
+              <th>Interpretacion</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for metric in interpretation_rows %}
+              <tr>
+                <td>{{ metric.label }}</td>
+                <td>{{ fmt_value(metric.value, metric.decimals, metric.unit) }}</td>
+                <td><span class="badge status-badge status-{{ metric.status_class }}">{{ metric.status }}</span></td>
+                <td>{{ metric.interpretation }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-3">
+        <p class="small text-muted mb-2">Consulta los rangos de referencia de cada metrica</p>
+        <div class="accordion" id="referenceRangesAccordion">
+          {% for metric_range in reference_ranges %}
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="referenceRangeHeading{{ loop.index }}">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#referenceRangeCollapse{{ loop.index }}" aria-expanded="false" aria-controls="referenceRangeCollapse{{ loop.index }}">
+                  {{ metric_range.label }}
+                </button>
+              </h2>
+              <div id="referenceRangeCollapse{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="referenceRangeHeading{{ loop.index }}" data-bs-parent="#referenceRangesAccordion">
+                <div class="accordion-body">
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>Estado</th>
+                          <th>Rango</th>
+                          <th>Interpretacion</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for item in metric_range["items"] %}
+                          <tr>
+                            <td><span class="badge status-badge status-{{ item.class }}">{{ item.status }}</span></td>
+                            <td class="fw-semibold">{{ item.range }}</td>
+                            <td>{{ item.interpretation }}</td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="physical-card p-4 mb-4">
+      <ul class="nav nav-tabs physical-tabs" id="physicalIndividualTabs" role="tablist">
+        {% for tab in ['Perfil antropometrico', 'Peso y grasa', 'Composicion corporal', 'Indice musculo-oseo', 'Pliegues', 'Perfil estructural'] %}
+          <li class="nav-item" role="presentation">
+            <button class="nav-link {% if loop.first %}active{% endif %}" id="individual-tab-{{ loop.index }}" data-bs-toggle="tab" data-bs-target="#individual-pane-{{ loop.index }}" type="button" role="tab" aria-selected="{{ 'true' if loop.first else 'false' }}">
+              {{ tab }}
+            </button>
+          </li>
+        {% endfor %}
+      </ul>
+      <div class="tab-content pt-4">
+        {% for tab in ['Perfil antropometrico', 'Peso y grasa', 'Composicion corporal', 'Indice musculo-oseo', 'Pliegues', 'Perfil estructural'] %}
+          <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="individual-pane-{{ loop.index }}" role="tabpanel" tabindex="0">
+            <div class="alert alert-secondary mb-0">Pendiente de migrar.</div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="physical-card p-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h4 class="section-title mb-1">Historial de mediciones</h4>
+          <p class="text-muted mb-0">Mediciones disponibles de la jugadora calculadas desde datos RAW.</p>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Peso</th>
+              <th>% Grasa</th>
+              <th>% Muscular</th>
+              <th>Suma 6 pliegues</th>
+              <th>Indice M/O</th>
+              <th>Tipo ISAK</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in player_records %}
+              <tr>
+                <td>{{ r.fecha_medicion or "-" }}</td>
+                <td>{{ fmt_value(r.peso_bruto_kg, 1, "kg") }}</td>
+                <td>{{ fmt_value(r.ajuste_adiposa_pct, 1, "%") }}</td>
+                <td>{{ fmt_value(r.ajuste_muscular_pct, 1, "%") }}</td>
+                <td>{{ fmt_value(r.suma_6_pliegues_mm, 1, "mm") }}</td>
+                <td>{{ fmt_value(r.idx_musculo_oseo, 2, "") }}</td>
+                <td>{{ r.tipo_isak or "-" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% else %}
+    <div class="physical-card p-4">
+      <div class="alert alert-warning mb-0">
+        No hay registros antropometricos disponibles para el filtro seleccionado.
+      </div>
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}
