@@ -5,6 +5,7 @@ import tempfile
 import unittest
 
 from dux import create_app
+from dux.controllers.dashboard_wellness_controller import _build_summary
 from dux.models import Base
 
 
@@ -125,7 +126,51 @@ class DashboardWellnessRouteTest(unittest.TestCase):
         self.assertIn(b"Test, Alexia", response.data)
         self.assertIn(b"1FF", response.data)
         self.assertIn(b"checkOut", response.data)
+        self.assertIn(b"15.0/25", response.data)
+        self.assertIn(b"0/1", response.data)
         self.assertIn(b"300.0", response.data)
+
+    def test_build_summary_uses_legacy_wellness_kpis(self):
+        records = [
+            {
+                "id_jugadora": "player-risk",
+                "nombre_jugadora": "Risk Player",
+                "tipo": "checkOut",
+                "recuperacion": 4,
+                "energia": 4,
+                "sueno": 4,
+                "stress": 4,
+                "dolor": 4,
+                "wellness_score": 20,
+                "rpe": 6,
+                "ua": 360,
+            },
+            {
+                "id_jugadora": "player-ok",
+                "nombre_jugadora": "Ok Player",
+                "tipo": "checkOut",
+                "recuperacion": 1,
+                "energia": 1,
+                "sueno": 1,
+                "stress": 1,
+                "dolor": 1,
+                "wellness_score": 5,
+                "rpe": 4,
+                "ua": 200,
+            },
+        ]
+
+        summary = _build_summary(records)
+
+        self.assertEqual(summary["total"], 2)
+        self.assertEqual(summary["wellness_promedio"], 12.5)
+        self.assertEqual(summary["wellness_estado"], "en fatiga")
+        self.assertEqual(summary["rpe_promedio"], 5.0)
+        self.assertEqual(summary["rpe_estado"], "moderado")
+        self.assertEqual(summary["ua_total"], 560)
+        self.assertEqual(summary["alertas_count"], 1)
+        self.assertEqual(summary["alertas_total_jugadoras"], 2)
+        self.assertEqual(summary["alertas_pct"], 50.0)
 
 
 if __name__ == "__main__":
