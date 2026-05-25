@@ -340,18 +340,18 @@ def _metric_status(metric: str, value: float | None) -> tuple[str, str, str]:
             return "Bajo", "warning", "Nivel de masa muscular mejorable para el alto rendimiento."
         if value <= 45:
             return "Adecuado", "success", "Buen nivel de desarrollo muscular para la categoria."
-        return "Excelente", "success", "Perfil muscular muy favorable para potencia y proteccion estructural."
+        return "Excelente", "excellent", "Perfil muscular muy favorable para potencia y proteccion estructural."
 
     if metric == "imo_medio":
         if value < 3.5:
             return "Bajo", "warning", "Relacion musculo / oseo por desarrollar."
         if value <= 4.2:
             return "Adecuado", "success", "Relacion favorable para el rendimiento."
-        return "Excelente", "success", "Perfil estructural muy favorable."
+        return "Excelente", "excellent", "Perfil estructural muy favorable."
 
     if metric == "pliegues_media":
         if value < 50:
-            return "Excelente", "success", "Perfil de alta competicion."
+            return "Excelente", "excellent", "Perfil de alta competicion."
         if value <= 70:
             return "Adecuado", "success", "Rango funcional para la mayoria de posiciones."
         if value <= 90:
@@ -359,6 +359,49 @@ def _metric_status(metric: str, value: float | None) -> tuple[str, str, str]:
         return "Elevado", "danger", "Fuera del rango objetivo de rendimiento."
 
     return "Descriptivo", "secondary", ""
+
+
+def _reference_ranges() -> list[dict[str, Any]]:
+    return [
+        {
+            "key": "grasa",
+            "label": "% Grasa",
+            "items": [
+                {"status": "Muy bajo", "range": "<14%", "class": "warning", "interpretation": "Vigilar disponibilidad energetica y contexto fisiologico."},
+                {"status": "Adecuado", "range": "14-20%", "class": "success", "interpretation": "Rango funcional para futbol femenino."},
+                {"status": "Moderado", "range": "20-24%", "class": "warning", "interpretation": "Con margen de optimizacion."},
+                {"status": "Elevado", "range": ">24%", "class": "danger", "interpretation": "Por encima del perfil deseado de rendimiento."},
+            ],
+        },
+        {
+            "key": "musculo",
+            "label": "% Muscular",
+            "items": [
+                {"status": "Bajo", "range": "<40%", "class": "warning", "interpretation": "Nivel de masa muscular mejorable para el alto rendimiento."},
+                {"status": "Adecuado", "range": "40-45%", "class": "success", "interpretation": "Buen nivel de desarrollo muscular para la categoria."},
+                {"status": "Excelente", "range": ">45%", "class": "excellent", "interpretation": "Perfil muscular muy favorable para potencia y proteccion estructural."},
+            ],
+        },
+        {
+            "key": "imo",
+            "label": "Indice M/O",
+            "items": [
+                {"status": "Bajo", "range": "<3.5", "class": "warning", "interpretation": "Relacion musculo / oseo por desarrollar."},
+                {"status": "Adecuado", "range": "3.5-4.2", "class": "success", "interpretation": "Relacion favorable para el rendimiento."},
+                {"status": "Excelente", "range": ">4.2", "class": "excellent", "interpretation": "Perfil estructural muy favorable."},
+            ],
+        },
+        {
+            "key": "pliegues",
+            "label": "6 pliegues",
+            "items": [
+                {"status": "Excelente", "range": "<50 mm", "class": "excellent", "interpretation": "Perfil de alta competicion."},
+                {"status": "Adecuado", "range": "50-70 mm", "class": "success", "interpretation": "Rango funcional para la mayoria de posiciones."},
+                {"status": "Moderado", "range": "70-90 mm", "class": "warning", "interpretation": "Con margen de ajuste nutricional y de carga."},
+                {"status": "Elevado", "range": ">90 mm", "class": "danger", "interpretation": "Fuera del rango objetivo de rendimiento."},
+            ],
+        },
+    ]
 
 
 def _build_group_metrics(
@@ -1176,6 +1219,7 @@ def build_physical_grupal_context(plantel: str | None = None, periodo: str = "ul
         },
         "cambios_clave": cambios_clave,
         "resumen_grupal": resumen_grupal,
+        "reference_ranges": _reference_ranges(),
         "technical_summary": _build_technical_summary(group_metrics),
         "stats": {
             "total_records": total_records,

@@ -86,13 +86,54 @@
   }
 
   .cell-success { background-color: #2ECC71 !important; }
-  .cell-success-strong { background-color: #27AE60 !important; }
+  .cell-success-strong { background-color: #0F766E !important; }
   .cell-warning { background-color: #F39C12 !important; }
   .cell-warning-soft {
     background-color: #F1C40F !important;
     color: #111827;
   }
   .cell-danger { background-color: #E74C3C !important; }
+
+  .status-badge {
+    font-weight: 700;
+  }
+
+  .status-success {
+    background-color: #2ECC71 !important;
+    color: #fff !important;
+  }
+
+  .status-excellent {
+    background-color: #0F766E !important;
+    color: #fff !important;
+    border: 1px solid rgba(13, 148, 136, .55);
+  }
+
+  .status-excellent::before {
+    content: "★ ";
+  }
+
+  .status-warning {
+    background-color: #F39C12 !important;
+    color: #fff !important;
+  }
+
+  .status-danger {
+    background-color: #E74C3C !important;
+    color: #fff !important;
+  }
+
+  .status-secondary {
+    background-color: #6c757d !important;
+    color: #fff !important;
+  }
+
+  .status-text.status-success { color: #198754 !important; }
+  .status-text.status-excellent { color: #0F766E !important; }
+  .status-text.status-excellent::before { content: "★ "; }
+  .status-text.status-warning { color: #B45309 !important; }
+  .status-text.status-danger { color: #DC3545 !important; }
+  .status-text.status-secondary { color: #6c757d !important; }
 </style>
 {% endblock %}
 
@@ -221,13 +262,64 @@
               <td>{{ metric.label }}</td>
               <td>{{ fmt_value(metric.value, metric.decimals, metric.unit) }}</td>
               <td>
-                <span class="badge text-bg-{{ metric.status_class }}">{{ metric.status }}</span>
+                <span class="badge status-badge status-{{ metric.status_class }}">{{ metric.status }}</span>
               </td>
               <td>{{ metric.interpretation }}</td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
+    </div>
+
+    <div class="mt-3">
+      <p class="small text-muted mb-2">Consulta los rangos de referencia de cada metrica</p>
+      <div class="accordion" id="referenceRangesAccordion">
+        {% for metric_range in reference_ranges %}
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="referenceRangeHeading{{ loop.index }}">
+              <button
+                class="accordion-button collapsed"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#referenceRangeCollapse{{ loop.index }}"
+                aria-expanded="false"
+                aria-controls="referenceRangeCollapse{{ loop.index }}"
+              >
+                {{ metric_range.label }}
+              </button>
+            </h2>
+            <div
+              id="referenceRangeCollapse{{ loop.index }}"
+              class="accordion-collapse collapse"
+              aria-labelledby="referenceRangeHeading{{ loop.index }}"
+              data-bs-parent="#referenceRangesAccordion"
+            >
+              <div class="accordion-body">
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Estado</th>
+                        <th>Rango</th>
+                        <th>Interpretacion</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for item in metric_range["items"] %}
+                        <tr>
+                          <td><span class="badge status-badge status-{{ item.class }}">{{ item.status }}</span></td>
+                          <td class="fw-semibold">{{ item.range }}</td>
+                          <td>{{ item.interpretation }}</td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
     </div>
   </div>
 
@@ -237,16 +329,16 @@
       El grupo presenta un peso medio de
       <strong>{{ fmt_value(technical_summary.peso_medio.value, technical_summary.peso_medio.decimals, technical_summary.peso_medio.unit) }}</strong>,
       con porcentaje de grasa
-      <strong class="text-{{ technical_summary.grasa_media.status_class }}">{{ technical_summary.grasa_media.status|lower }}</strong>
+      <strong class="status-text status-{{ technical_summary.grasa_media.status_class }}">{{ technical_summary.grasa_media.status|lower }}</strong>
       ({{ fmt_value(technical_summary.grasa_media.value, technical_summary.grasa_media.decimals, technical_summary.grasa_media.unit) }})
       y porcentaje muscular
-      <strong class="text-{{ technical_summary.musculo_medio.status_class }}">{{ technical_summary.musculo_medio.status|lower }}</strong>
+      <strong class="status-text status-{{ technical_summary.musculo_medio.status_class }}">{{ technical_summary.musculo_medio.status|lower }}</strong>
       ({{ fmt_value(technical_summary.musculo_medio.value, technical_summary.musculo_medio.decimals, technical_summary.musculo_medio.unit) }}).
       El indice musculo / oseo medio se situa en nivel
-      <strong class="text-{{ technical_summary.imo_medio.status_class }}">{{ technical_summary.imo_medio.status|lower }}</strong>
+      <strong class="status-text status-{{ technical_summary.imo_medio.status_class }}">{{ technical_summary.imo_medio.status|lower }}</strong>
       ({{ fmt_value(technical_summary.imo_medio.value, technical_summary.imo_medio.decimals, technical_summary.imo_medio.unit) }}),
       mientras que la suma de 6 pliegues refleja un perfil
-      <strong class="text-{{ technical_summary.pliegues_media.status_class }}">{{ technical_summary.pliegues_media.status|lower }}</strong>
+      <strong class="status-text status-{{ technical_summary.pliegues_media.status_class }}">{{ technical_summary.pliegues_media.status|lower }}</strong>
       ({{ fmt_value(technical_summary.pliegues_media.value, technical_summary.pliegues_media.decimals, technical_summary.pliegues_media.unit) }}).
     </p>
   </div>
