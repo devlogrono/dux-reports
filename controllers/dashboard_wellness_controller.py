@@ -9,6 +9,8 @@ from dux import cache, db
 
 bp = Blueprint("dashboard_wellness", __name__, url_prefix="/dashboard/wellness")
 
+WELLNESS_COLUMNS = ["recuperacion", "energia", "sueno", "stress", "dolor"]
+
 
 def _user_cache_key():
     user_id = current_user.id if current_user.is_authenticated else "anon"
@@ -29,17 +31,11 @@ def _round_metric(value):
 
 
 def _record_score(row):
-    values = [
-        _as_float(row.get("recuperacion")),
-        _as_float(row.get("energia")),
-        _as_float(row.get("sueno")),
-        _as_float(row.get("stress")),
-        _as_float(row.get("dolor")),
-    ]
+    values = [_as_float(row.get(column)) for column in WELLNESS_COLUMNS]
     values = [v for v in values if v is not None]
     if not values:
         return None
-    return sum(values) / len(values)
+    return sum(values)
 
 
 def _avg(values):
@@ -105,7 +101,7 @@ def _fetch_filter_options():
     return planteles, jugadoras, tipos
 
 
-def _fetch_wellness_records(planteles, jugadoras, tipos, since):
+def _fetch_wellness_records(planteles, jugadoras, tipos, since, limit=None):
     sql = """
         SELECT
             w.id,
@@ -148,7 +144,10 @@ def _fetch_wellness_records(planteles, jugadoras, tipos, since):
         params["tipos"] = tipos
         bindparams.append(bindparam("tipos", expanding=True))
 
-    sql += " ORDER BY w.fecha_sesion DESC, w.fecha_hora_registro DESC LIMIT 200"
+    sql += " ORDER BY w.fecha_sesion DESC, w.fecha_hora_registro DESC"
+    if limit:
+        sql += " LIMIT :limit"
+        params["limit"] = limit
 
     statement = text(sql)
     if bindparams:
@@ -170,12 +169,92 @@ def _fetch_wellness_records(planteles, jugadoras, tipos, since):
     return records
 
 
+def _is_checkin(record):
+    return str(record.get("tipo") or "").lower().replace("-", "") == "checkin"
+
+
+def _build_alerts(records):
+    checkin_records = [record for record in records if _is_checkin(record)]
+    base_records = checkin_records or records
+
+    players = {}
+    for record in base_records:
+        player_key = record.get("id_jugadora") or record.get("nombre_jugadora")
+        if not player_key:
+            continue
+        players.setdefault(player_key, {"nombre": record.get("nombre_jugadora"), "values": []})
+        players[player_key]["values"].append(record)
+
+    risky_players = []
+    for player in players.values():
+        column_means = []
+        for column in WELLNESS_COLUMNS:
+            column_mean = _avg([_as_float(record.get(column)) for record in player["values"]])
+            if column_mean is not None:
+                column_means.append(column_mean)
+
+        wellness_mean_1_5 = _avg(column_means)
+        pain_mean = _avg([_as_float(record.get("dolor")) for record in player["values"]])
+        is_risky = (
+            (wellness_mean_1_5 is not None and wellness_mean_1_5 > 3)
+            or (pain_mean is not None and pain_mean > 3)
+        )
+        if is_risky:
+            risky_players.append(
+                {
+                    "nombre": player["nombre"],
+                    "prom_w_1_5": _round_metric(wellness_mean_1_5),
+                    "dolor_mean": _round_metric(pain_mean),
+                }
+            )
+
+    total_players = len(players)
+    alerts_count = len(risky_players)
+    alerts_pct = round((alerts_count / total_players) * 100, 1) if total_players else 0
+
+    return {
+        "count": alerts_count,
+        "total_jugadoras": total_players,
+        "pct": alerts_pct,
+        "jugadoras": risky_players,
+    }
+
+
+def _wellness_status(value):
+    if value is None:
+        return "sin datos"
+    if value > 20:
+        return "óptimo"
+    if value >= 15:
+        return "moderado"
+    return "en fatiga"
+
+
+def _rpe_status(value):
+    if value in (None, 0):
+        return "sin datos"
+    if value < 5:
+        return "bajo"
+    if value <= 7:
+        return "moderado"
+    return "alto"
+
+
 def _build_summary(records):
+    alerts = _build_alerts(records)
+    wellness_average = _round_metric(_avg([r["wellness_score"] for r in records]))
+    rpe_average = _round_metric(_avg([r["rpe"] for r in records]))
     return {
         "total": len(records),
-        "wellness_promedio": _round_metric(_avg([r["wellness_score"] for r in records])),
-        "rpe_promedio": _round_metric(_avg([r["rpe"] for r in records])),
+        "wellness_promedio": wellness_average,
+        "wellness_estado": _wellness_status(wellness_average),
+        "rpe_promedio": rpe_average,
+        "rpe_estado": _rpe_status(rpe_average),
         "ua_total": _round_metric(sum([r["ua"] or 0 for r in records])),
+        "alertas_count": alerts["count"],
+        "alertas_total_jugadoras": alerts["total_jugadoras"],
+        "alertas_pct": alerts["pct"],
+        "alertas_jugadoras": alerts["jugadoras"],
     }
 
 
@@ -220,5 +299,6 @@ def index():
         selected_tipos=selected_tipos,
         days=days,
         records=records,
+        display_records=records[:200],
         summary=summary,
     )
