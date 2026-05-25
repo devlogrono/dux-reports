@@ -290,6 +290,244 @@ def _build_perfil_antropometrico_chart(records: list[dict[str, Any]]) -> dict[st
     }
 
 
+def _distribucion_metric_config() -> dict[str, dict[str, Any]]:
+    return {
+        "peso_bruto_kg": {"label": "Peso (kg)", "descriptiva": True},
+        "talla_corporal_cm": {"label": "Talla (cm)", "descriptiva": True},
+        "suma_6_pliegues_mm": {"label": "Suma 6 pliegues (mm)", "descriptiva": False},
+        "ajuste_adiposa_pct": {"label": "% Grasa", "descriptiva": False},
+        "ajuste_muscular_pct": {"label": "% Muscular", "descriptiva": False},
+        "masa_osea_kg": {"label": "Masa osea (kg)", "descriptiva": True},
+        "idx_musculo_oseo": {"label": "Indice musculo-oseo", "descriptiva": False},
+    }
+
+
+def _distribution_color(metric: str, value: float) -> str:
+    if metric == "ajuste_adiposa_pct":
+        if value < 14:
+            return "#F1C40F"
+        if value <= 20:
+            return "#2ECC71"
+        if value <= 24:
+            return "#F39C12"
+        return "#E74C3C"
+
+    if metric == "ajuste_muscular_pct":
+        if value < 40:
+            return "#F39C12"
+        if value <= 45:
+            return "#2ECC71"
+        return "#27AE60"
+
+    if metric == "idx_musculo_oseo":
+        if value < 3.5:
+            return "#F39C12"
+        if value <= 4.2:
+            return "#2ECC71"
+        return "#27AE60"
+
+    if metric == "suma_6_pliegues_mm":
+        if value < 50:
+            return "#27AE60"
+        if value <= 70:
+            return "#2ECC71"
+        if value <= 90:
+            return "#F39C12"
+        return "#E74C3C"
+
+    return "#4A6FBF"
+
+
+def _distribution_reference(metric: str) -> dict[str, Any] | None:
+    references = {
+        "ajuste_adiposa_pct": {"value": 20, "label": "Limite adecuado"},
+        "ajuste_muscular_pct": {"value": 40, "label": "Referencia minima"},
+        "idx_musculo_oseo": {"value": 3.5, "label": "Referencia minima"},
+        "suma_6_pliegues_mm": {"value": 70, "label": "Limite adecuado"},
+    }
+    return references.get(metric)
+
+
+def _distribution_buckets(metric: str, values: list[float]) -> list[dict[str, Any]]:
+    bucket_defs = {
+        "ajuste_adiposa_pct": [
+            ("Muy bajo", "#F1C40F", lambda v: v < 14),
+            ("Adecuado", "#2ECC71", lambda v: 14 <= v <= 20),
+            ("Moderado", "#F39C12", lambda v: 20 < v <= 24),
+            ("Elevado", "#E74C3C", lambda v: v > 24),
+        ],
+        "ajuste_muscular_pct": [
+            ("Bajo", "#F39C12", lambda v: v < 40),
+            ("Adecuado", "#2ECC71", lambda v: 40 <= v <= 45),
+            ("Excelente", "#27AE60", lambda v: v > 45),
+        ],
+        "idx_musculo_oseo": [
+            ("Bajo", "#F39C12", lambda v: v < 3.5),
+            ("Adecuado", "#2ECC71", lambda v: 3.5 <= v <= 4.2),
+            ("Excelente", "#27AE60", lambda v: v > 4.2),
+        ],
+        "suma_6_pliegues_mm": [
+            ("Excelente", "#27AE60", lambda v: v < 50),
+            ("Adecuado", "#2ECC71", lambda v: 50 <= v <= 70),
+            ("Moderado", "#F39C12", lambda v: 70 < v <= 90),
+            ("Elevado", "#E74C3C", lambda v: v > 90),
+        ],
+    }
+
+    return [
+        {"label": label, "color": color, "count": sum(1 for value in values if check(value))}
+        for label, color, check in bucket_defs.get(metric, [])
+    ]
+
+
+def _build_distribucion_corporal_chart(records: list[dict[str, Any]]) -> dict[str, Any]:
+    plot_records = _latest_records_by_player(records)
+    metrics = {}
+
+    for metric, config in _distribucion_metric_config().items():
+        points = []
+        for record in plot_records:
+            value = _safe_float(record.get(metric))
+            if value is None:
+                continue
+
+            points.append(
+                {
+                    "jugadora": str(record.get("nombre_jugadora") or "").strip(),
+                    "value": round(value, 4),
+                    "color": _distribution_color(metric, value),
+                }
+            )
+
+        if not points:
+            continue
+
+        points = sorted(points, key=lambda item: item["value"])
+        values = [point["value"] for point in points]
+        mean_value = _mean(values)
+
+        metrics[metric] = {
+            "key": metric,
+            "label": config["label"],
+            "descriptiva": config["descriptiva"],
+            "caption": (
+                "Distribucion individual del grupo con valores minimo, maximo y promedio."
+                if config["descriptiva"]
+                else "Distribucion individual del grupo respecto a rangos de referencia y valores extremos."
+            ),
+            "points": points,
+            "summary": {
+                "mean": mean_value,
+                "min": min(values),
+                "max": max(values),
+            },
+            "reference": _distribution_reference(metric),
+            "buckets": _distribution_buckets(metric, values),
+        }
+
+    default_metric = next(iter(metrics), None)
+    return {
+        "default_metric": default_metric,
+        "metrics": metrics,
+    }
+
+
+def _summary_cell_class(column_key: str, value: float | None) -> str:
+    if value is None:
+        return ""
+
+    if column_key == "grasa_media":
+        if value < 14:
+            return "cell-warning-soft"
+        if value <= 20:
+            return "cell-success"
+        if value <= 24:
+            return "cell-warning"
+        return "cell-danger"
+
+    if column_key == "musculo_media":
+        if value < 40:
+            return "cell-danger"
+        if value <= 45:
+            return "cell-success"
+        return "cell-success-strong"
+
+    if column_key == "pliegues_media":
+        if value < 50:
+            return "cell-success-strong"
+        if value <= 70:
+            return "cell-success"
+        if value <= 90:
+            return "cell-warning"
+        return "cell-danger"
+
+    if column_key == "imo_media":
+        if value < 3.5:
+            return "cell-warning"
+        if value <= 4.2:
+            return "cell-success"
+        return "cell-success-strong"
+
+    return ""
+
+
+def _build_resumen_grupal_table(records: list[dict[str, Any]]) -> dict[str, Any]:
+    records_by_player: dict[str, list[dict[str, Any]]] = {}
+    for record in records:
+        player_name = str(record.get("nombre_jugadora") or "").strip()
+        if player_name:
+            records_by_player.setdefault(player_name, []).append(record)
+
+    columns = [
+        {"key": "jugadora", "label": "Jugadora", "decimals": None},
+        {"key": "peso_medio", "label": "Peso medio (kg)", "decimals": 2},
+        {"key": "grasa_media", "label": "% Grasa media", "decimals": 2},
+        {"key": "musculo_media", "label": "% Muscular medio", "decimals": 2},
+        {"key": "pliegues_media", "label": "6 Pliegues medios (mm)", "decimals": 2},
+        {"key": "imo_media", "label": "Indice M/O medio", "decimals": 2},
+        {"key": "n_mediciones", "label": "N mediciones", "decimals": 0},
+    ]
+    rows = []
+
+    for player_name, player_records in records_by_player.items():
+        row = {
+            "jugadora": player_name,
+            "peso_medio": _mean([_safe_float(r.get("peso_bruto_kg")) for r in player_records]),
+            "grasa_media": _mean([_safe_float(r.get("ajuste_adiposa_pct")) for r in player_records]),
+            "musculo_media": _mean([_safe_float(r.get("ajuste_muscular_pct")) for r in player_records]),
+            "pliegues_media": _mean([_safe_float(r.get("suma_6_pliegues_mm")) for r in player_records]),
+            "imo_media": _mean([_safe_float(r.get("idx_musculo_oseo")) for r in player_records]),
+            "n_mediciones": len(player_records),
+        }
+        row["cells"] = {
+            column["key"]: _summary_cell_class(column["key"], row.get(column["key"]))
+            for column in columns
+        }
+        rows.append(row)
+
+    rows = sorted(
+        rows,
+        key=lambda row: (
+            row["peso_medio"] is None,
+            row["peso_medio"] if row["peso_medio"] is not None else 0,
+            row["jugadora"],
+        ),
+    )
+
+    return {
+        "columns": columns,
+        "rows": rows,
+        "sort_options": [
+            {"key": "peso_medio", "label": "Peso medio (kg)", "higher_better": None},
+            {"key": "grasa_media", "label": "% Grasa media", "higher_better": False},
+            {"key": "musculo_media", "label": "% Muscular medio", "higher_better": True},
+            {"key": "pliegues_media", "label": "6 Pliegues medios (mm)", "higher_better": False},
+            {"key": "imo_media", "label": "Indice M/O medio", "higher_better": True},
+            {"key": "n_mediciones", "label": "N mediciones", "higher_better": True},
+        ],
+    }
+
+
 def build_physical_grupal_context(plantel: str | None = None, periodo: str = "ultima") -> dict[str, Any]:
     """
     Contexto de la vista grupal read-only.
@@ -310,6 +548,8 @@ def build_physical_grupal_context(plantel: str | None = None, periodo: str = "ul
     latest_records = _latest_records_by_player(records)
     group_metrics = _build_group_metrics(period_records, records, periodo)
     perfil_antropometrico = _build_perfil_antropometrico_chart(period_records)
+    distribucion_corporal = _build_distribucion_corporal_chart(period_records)
+    resumen_grupal = _build_resumen_grupal_table(period_records)
 
     return {
         "competitions": competitions,
@@ -322,7 +562,9 @@ def build_physical_grupal_context(plantel: str | None = None, periodo: str = "ul
         "group_metrics": group_metrics,
         "grupal_charts": {
             "perfil_antropometrico": perfil_antropometrico,
+            "distribucion_corporal": distribucion_corporal,
         },
+        "resumen_grupal": resumen_grupal,
         "technical_summary": _build_technical_summary(group_metrics),
         "stats": {
             "total_records": total_records,
