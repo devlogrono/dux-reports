@@ -407,13 +407,26 @@
             Peso y grasa
           </button>
         </li>
-        {% for tab in ['Composicion corporal', 'Indice musculo-oseo', 'Pliegues', 'Perfil estructural'] %}
-          <li class="nav-item" role="presentation">
-            <button class="nav-link" id="individual-tab-pending-{{ loop.index }}" data-bs-toggle="tab" data-bs-target="#individual-pane-pending-{{ loop.index }}" type="button" role="tab" aria-selected="false">
-              {{ tab }}
-            </button>
-          </li>
-        {% endfor %}
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="individual-tab-composicion" data-bs-toggle="tab" data-bs-target="#individual-pane-composicion" type="button" role="tab" aria-selected="false">
+            Composicion corporal
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="individual-tab-imo" data-bs-toggle="tab" data-bs-target="#individual-pane-imo" type="button" role="tab" aria-selected="false">
+            Indice musculo-oseo
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="individual-tab-pliegues" data-bs-toggle="tab" data-bs-target="#individual-pane-pliegues" type="button" role="tab" aria-selected="false">
+            Pliegues
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="individual-tab-estructural" data-bs-toggle="tab" data-bs-target="#individual-pane-estructural" type="button" role="tab" aria-selected="false">
+            Perfil estructural
+          </button>
+        </li>
       </ul>
       <div class="tab-content pt-4">
         <div class="tab-pane fade show active" id="individual-pane-perfil" role="tabpanel" tabindex="0">
@@ -465,11 +478,93 @@
           {% endif %}
         </div>
 
-        {% for tab in ['Composicion corporal', 'Indice musculo-oseo', 'Pliegues', 'Perfil estructural'] %}
-          <div class="tab-pane fade" id="individual-pane-pending-{{ loop.index }}" role="tabpanel" tabindex="0">
-            <div class="alert alert-secondary mb-0">Pendiente de migrar.</div>
-          </div>
-        {% endfor %}
+        <div class="tab-pane fade" id="individual-pane-composicion" role="tabpanel" tabindex="0">
+          {% if individual_charts.composicion_corporal.has_enough_data %}
+            <p class="text-muted mb-3">{{ individual_charts.composicion_corporal.caption }}</p>
+            <div id="individualComposicionChart" class="chart-panel"></div>
+            <div class="row g-3 mt-2">
+              <div class="col-12 col-lg-6">
+                <div class="alert alert-light border h-100 mb-0">
+                  <div class="fw-semibold mb-2">Comparacion ultima vs anterior</div>
+                  {% for item in individual_charts.composicion_corporal.trends.last_vs_previous %}
+                    <div class="small text-muted">- {{ item }}</div>
+                  {% endfor %}
+                </div>
+              </div>
+              <div class="col-12 col-lg-6">
+                <div class="alert alert-light border h-100 mb-0">
+                  <div class="fw-semibold mb-2">Comparacion primera vs ultima</div>
+                  {% for item in individual_charts.composicion_corporal.trends.first_vs_last %}
+                    <div class="small text-muted">- {{ item }}</div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+          {% else %}
+            <div class="alert alert-warning mb-0">Sin datos suficientes.</div>
+          {% endif %}
+        </div>
+
+        <div class="tab-pane fade" id="individual-pane-imo" role="tabpanel" tabindex="0">
+          {% if individual_charts.indice_musculo_oseo.has_enough_data %}
+            <p class="text-muted mb-3">{{ individual_charts.indice_musculo_oseo.caption }}</p>
+            <div id="individualImoChart" class="chart-panel"></div>
+            <div class="row g-3 mt-2">
+              <div class="col-12 col-lg-6">
+                <div class="alert alert-light border h-100 mb-0">
+                  <div class="fw-semibold mb-2">Comparacion ultima vs anterior</div>
+                  {% for item in individual_charts.indice_musculo_oseo.trends.last_vs_previous %}
+                    <div class="small text-muted">- {{ item }}</div>
+                  {% endfor %}
+                </div>
+              </div>
+              <div class="col-12 col-lg-6">
+                <div class="alert alert-light border h-100 mb-0">
+                  <div class="fw-semibold mb-2">Comparacion primera vs ultima</div>
+                  {% for item in individual_charts.indice_musculo_oseo.trends.first_vs_last %}
+                    <div class="small text-muted">- {{ item }}</div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+          {% else %}
+            <div class="alert alert-warning mb-0">Sin datos suficientes.</div>
+          {% endif %}
+        </div>
+
+        <div class="tab-pane fade" id="individual-pane-pliegues" role="tabpanel" tabindex="0">
+          {% if individual_charts.pliegues.has_enough_data %}
+            <p class="text-muted mb-3">{{ individual_charts.pliegues.caption }}</p>
+            <div id="individualSumaPlieguesChart" class="chart-panel mb-4"></div>
+            {% if individual_charts.pliegues.pliegues %}
+              <div id="individualPlieguesDetalleChart" class="chart-panel"></div>
+            {% endif %}
+            <div class="row g-3 mt-2">
+              <div class="col-12 col-lg-6">
+                <div class="alert alert-light border h-100 mb-0">
+                  <div class="fw-semibold mb-2">Comparacion ultima vs anterior</div>
+                  {% for item in individual_charts.pliegues.trends.last_vs_previous %}
+                    <div class="small text-muted">- {{ item }}</div>
+                  {% endfor %}
+                </div>
+              </div>
+              <div class="col-12 col-lg-6">
+                <div class="alert alert-light border h-100 mb-0">
+                  <div class="fw-semibold mb-2">Comparacion primera vs ultima</div>
+                  {% for item in individual_charts.pliegues.trends.first_vs_last %}
+                    <div class="small text-muted">- {{ item }}</div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+          {% else %}
+            <div class="alert alert-warning mb-0">Sin datos suficientes.</div>
+          {% endif %}
+        </div>
+
+        <div class="tab-pane fade" id="individual-pane-estructural" role="tabpanel" tabindex="0">
+          <div class="alert alert-secondary mb-0">Pendiente de migrar.</div>
+        </div>
       </div>
     </div>
 
@@ -526,7 +621,7 @@
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    const individualCharts = {{ individual_charts|tojson }};
+    const individualCharts = {{ (individual_charts|default({}))|tojson }};
 
     function renderPerfilAntropometrico() {
       const chartEl = document.getElementById("individualPerfilAntropometricoChart");
@@ -679,13 +774,184 @@
       Plotly.newPlot(chartEl, traces, layout, { responsive: true, displayModeBar: false });
     }
 
+    function renderComposicionCorporal() {
+      const chartEl = document.getElementById("individualComposicionChart");
+      const chartData = individualCharts.composicion_corporal || {};
+      if (!chartEl || !window.Plotly || !chartData.has_enough_data || !chartData.points) {
+        return;
+      }
+
+      const dates = chartData.points.map((point) => point.fecha);
+      const traces = [
+        {
+          x: dates,
+          y: chartData.points.map((point) => point.grasa_pct),
+          name: "% Grasa",
+          type: "scatter",
+          mode: "lines+markers+text",
+          line: { width: 3, color: "#EF553B" },
+          marker: { size: 8 },
+          text: chartData.points.map((point) => point.grasa_pct === null ? "" : point.grasa_pct.toFixed(1)),
+          textposition: "top center",
+          hovertemplate: "<b>% Grasa</b><br>%{x}<br>%{y:.1f} %<extra></extra>"
+        },
+        {
+          x: dates,
+          y: chartData.points.map((point) => point.musculo_pct),
+          name: "% Muscular",
+          type: "scatter",
+          mode: "lines+markers+text",
+          line: { width: 3, color: "#636EFA" },
+          marker: { size: 8 },
+          text: chartData.points.map((point) => point.musculo_pct === null ? "" : point.musculo_pct.toFixed(1)),
+          textposition: "top center",
+          hovertemplate: "<b>% Muscular</b><br>%{x}<br>%{y:.1f} %<extra></extra>"
+        }
+      ];
+
+      (chartData.mass_series || []).forEach((series) => {
+        traces.push({
+          x: dates,
+          y: chartData.points.map((point) => point[series.key]),
+          name: series.label + " (kg)",
+          yaxis: "y2",
+          type: "bar",
+          marker: { color: series.color },
+          opacity: 0.45,
+          hovertemplate: "<b>" + series.label + "</b><br>%{x}<br>%{y:.1f} kg<extra></extra>"
+        });
+      });
+
+      const layout = {
+        template: "plotly_white",
+        barmode: "group",
+        xaxis: { type: "category", title: "Fecha de medicion" },
+        yaxis: { title: "Porcentaje (%)", showgrid: true, gridcolor: "rgba(0,0,0,0.06)" },
+        yaxis2: { title: "Masa (kg)", overlaying: "y", side: "right", showgrid: false },
+        legend: { orientation: "h", y: -0.25, x: 0.5, xanchor: "center" },
+        showlegend: true,
+        height: 540,
+        margin: { t: 40, b: 110, l: 56, r: 56 }
+      };
+
+      Plotly.newPlot(chartEl, traces, layout, { responsive: true, displayModeBar: false });
+    }
+
+    function renderIndiceMusculoOseo() {
+      const chartEl = document.getElementById("individualImoChart");
+      const chartData = individualCharts.indice_musculo_oseo || {};
+      if (!chartEl || !window.Plotly || !chartData.has_enough_data || !chartData.points) {
+        return;
+      }
+
+      const trace = {
+        x: chartData.points.map((point) => point.fecha),
+        y: chartData.points.map((point) => point.value),
+        name: "Indice musculo-oseo",
+        type: "scatter",
+        mode: "lines+markers+text",
+        line: { width: 4, color: "#636EFA" },
+        marker: { size: 9 },
+        text: chartData.points.map((point) => point.value.toFixed(2)),
+        textposition: "top center",
+        hovertemplate: "<b>Indice musculo-oseo</b><br>%{x}<br>%{y:.2f}<extra></extra>"
+      };
+
+      const layout = {
+        template: "plotly_white",
+        xaxis: { type: "category", title: "Fecha de medicion" },
+        yaxis: { title: "Indice musculo-oseo", showgrid: true, gridcolor: "rgba(0,0,0,0.06)" },
+        showlegend: false,
+        height: 520,
+        margin: { t: 40, b: 90, l: 56, r: 40 }
+      };
+
+      Plotly.newPlot(chartEl, [trace], layout, { responsive: true, displayModeBar: false });
+    }
+
+    function renderPliegues() {
+      const sumEl = document.getElementById("individualSumaPlieguesChart");
+      const detailEl = document.getElementById("individualPlieguesDetalleChart");
+      const chartData = individualCharts.pliegues || {};
+      if (!window.Plotly || !chartData.has_enough_data || !chartData.points) {
+        return;
+      }
+
+      const dates = chartData.points.map((point) => point.fecha);
+      if (sumEl) {
+        const sumTrace = {
+          x: dates,
+          y: chartData.points.map((point) => point.suma_6_pliegues_mm),
+          name: "Suma 6 pliegues",
+          type: "scatter",
+          mode: "lines+markers+text",
+          line: { width: 4, color: "#636EFA" },
+          marker: { size: 9 },
+          text: chartData.points.map((point) => point.suma_6_pliegues_mm === null ? "" : point.suma_6_pliegues_mm.toFixed(1)),
+          textposition: "top center",
+          hovertemplate: "<b>Suma 6 pliegues</b><br>%{x}<br>%{y:.1f} mm<extra></extra>"
+        };
+
+        Plotly.newPlot(sumEl, [sumTrace], {
+          template: "plotly_white",
+          xaxis: { type: "category", title: "Fecha de medicion" },
+          yaxis: { title: "Suma 6 pliegues (mm)", showgrid: true, gridcolor: "rgba(0,0,0,0.06)" },
+          showlegend: false,
+          height: 500,
+          margin: { t: 40, b: 90, l: 56, r: 40 },
+          shapes: [
+            { type: "line", xref: "paper", x0: 0, x1: 1, y0: 50, y1: 50, line: { color: "#27AE60", width: 1.2, dash: "dot" } },
+            { type: "line", xref: "paper", x0: 0, x1: 1, y0: 70, y1: 70, line: { color: "#2ECC71", width: 1.2, dash: "dot" } },
+            { type: "line", xref: "paper", x0: 0, x1: 1, y0: 90, y1: 90, line: { color: "#F39C12", width: 1.2, dash: "dot" } }
+          ],
+          annotations: [
+            { xref: "paper", x: 0, y: 50, text: "Excelente", showarrow: false, xanchor: "left", yanchor: "bottom", font: { color: "#27AE60", size: 12 } },
+            { xref: "paper", x: 0, y: 70, text: "Adecuado", showarrow: false, xanchor: "left", yanchor: "bottom", font: { color: "#2ECC71", size: 12 } },
+            { xref: "paper", x: 0, y: 90, text: "Moderado", showarrow: false, xanchor: "left", yanchor: "bottom", font: { color: "#F39C12", size: 12 } }
+          ]
+        }, { responsive: true, displayModeBar: false });
+      }
+
+      if (detailEl && chartData.pliegues && chartData.pliegues.length > 0) {
+        const traces = chartData.pliegues.map((series) => ({
+          x: dates,
+          y: chartData.points.map((point) => point[series.key]),
+          name: series.label,
+          type: "scatter",
+          mode: "lines+markers+text",
+          line: { width: 3 },
+          marker: { size: 8 },
+          text: chartData.points.map((point) => point[series.key] === null ? "" : point[series.key].toFixed(1)),
+          textposition: "top center",
+          hovertemplate: "<b>" + series.label + "</b><br>%{x}<br>%{y:.1f} mm<extra></extra>"
+        }));
+
+        Plotly.newPlot(detailEl, traces, {
+          title: { text: "Detalle de pliegues", x: 0.02, font: { size: 18 } },
+          template: "plotly_white",
+          xaxis: { type: "category", title: "Fecha de medicion" },
+          yaxis: { title: "Pliegue (mm)", showgrid: true, gridcolor: "rgba(0,0,0,0.06)" },
+          legend: { orientation: "h", y: -0.25, x: 0.5, xanchor: "center" },
+          showlegend: true,
+          height: 520,
+          margin: { t: 60, b: 110, l: 56, r: 40 }
+        }, { responsive: true, displayModeBar: false });
+      }
+    }
+
     renderPerfilAntropometrico();
     renderPesoGrasa();
+    renderComposicionCorporal();
+    renderIndiceMusculoOseo();
+    renderPliegues();
 
     document.querySelectorAll('button[data-bs-toggle="tab"]').forEach((button) => {
       button.addEventListener("shown.bs.tab", function () {
         renderPerfilAntropometrico();
         renderPesoGrasa();
+        renderComposicionCorporal();
+        renderIndiceMusculoOseo();
+        renderPliegues();
       });
     });
   });

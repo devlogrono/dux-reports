@@ -606,23 +606,45 @@ def _build_individual_perfil_antropometrico_chart(
     return {
         **chart,
         "highlighted": highlighted,
-        "interpretation": _perfil_group_interpretation(highlighted.get("grupo") if highlighted else None)
-        #"caption": "Perfil antropometrico individual dentro del grupo, destacando la ultima medicion disponible de la jugadora.",
+        "interpretation": _perfil_group_interpretation(highlighted.get("grupo") if highlighted else None),
+        "caption": "Perfil antropometrico individual dentro del grupo, destacando la ultima medicion disponible de la jugadora.",
     }
 
 
-def _trend_sentence(metric: str, delta: float | None) -> str | None:
+def _trend_sentence(metric: str, delta: float | None, label_override: str | None = None) -> str | None:
     if delta is None:
         return None
 
-    if metric == "grasa":
+    if metric in {"grasa", "musculo"}:
+        metric_label = label_override or ("porcentaje graso" if metric == "grasa" else "porcentaje muscular")
         if abs(delta) < 1:
-            return f"Estabilidad del porcentaje graso ({delta:+.1f} pp)"
+            return f"Estabilidad del {metric_label} ({delta:+.1f} pp)"
         if delta > 0:
             label = "Ligero aumento" if abs(delta) < 2 else "Aumento marcado"
-            return f"{label} del porcentaje graso ({delta:+.1f} pp)"
+            return f"{label} del {metric_label} ({delta:+.1f} pp)"
         label = "Ligera reduccion" if abs(delta) < 2 else "Reduccion marcada"
-        return f"{label} del porcentaje graso ({delta:+.1f} pp)"
+        return f"{label} del {metric_label} ({delta:+.1f} pp)"
+
+    if metric == "imo":
+        if abs(delta) < 0.05:
+            return f"Estabilidad del indice musculo-oseo ({delta:+.2f})"
+        if delta > 0:
+            label = "Ligero aumento" if abs(delta) < 0.15 else "Aumento marcado"
+            return f"{label} del indice musculo-oseo ({delta:+.2f})"
+        label = "Ligera reduccion" if abs(delta) < 0.15 else "Reduccion marcada"
+        return f"{label} del indice musculo-oseo ({delta:+.2f})"
+
+    if metric in {"pliegues", "pliegue"}:
+        threshold_stable = 3 if metric == "pliegues" else 1
+        threshold_marked = 8 if metric == "pliegues" else 3
+        metric_label = label_override or ("suma de pliegues" if metric == "pliegues" else "pliegue")
+        if abs(delta) < threshold_stable:
+            return f"Estabilidad de {metric_label} ({delta:+.1f} mm)"
+        if delta > 0:
+            label = "Ligero aumento" if abs(delta) < threshold_marked else "Aumento marcado"
+            return f"{label} de {metric_label} ({delta:+.1f} mm)"
+        label = "Ligera reduccion" if abs(delta) < threshold_marked else "Reduccion marcada"
+        return f"{label} de {metric_label} ({delta:+.1f} mm)"
 
     if abs(delta) < 0.8:
         return f"Estabilidad del peso corporal ({delta:+.1f} kg)"
@@ -690,6 +712,143 @@ def _build_individual_peso_grasa_chart(player_records: list[dict[str, Any]]) -> 
         "weight_range": weight_range,
         "caption": "Evolucion historica del peso corporal y del porcentaje de grasa. Permite contextualizar si los cambios de peso se acompanan de una mejora o empeoramiento de la composicion corporal.",
         "trends": trends,
+    }
+
+
+def _build_two_point_trends(points: list[dict[str, Any]], metrics: list[dict[str, str]]) -> dict[str, list[str]]:
+    trends = {"last_vs_previous": [], "first_vs_last": []}
+    if len(points) < 2:
+        return trends
+
+    last = points[-1]
+    previous = points[-2]
+    first = points[0]
+
+    for metric in metrics:
+        key = metric["key"]
+        trend_type = metric["type"]
+        label = metric.get("label")
+        if last.get(key) is not None and previous.get(key) is not None:
+            sentence = _trend_sentence(trend_type, last[key] - previous[key], label)
+            if sentence:
+                trends["last_vs_previous"].append(sentence)
+        if last.get(key) is not None and first.get(key) is not None:
+            sentence = _trend_sentence(trend_type, last[key] - first[key], label)
+            if sentence:
+                trends["first_vs_last"].append(sentence)
+
+    return trends
+
+
+def _build_individual_composicion_chart(player_records: list[dict[str, Any]]) -> dict[str, Any]:
+    sorted_records = _sort_records(player_records, reverse=False)
+    mass_config = [
+        ("masa_adiposa_kg", "Masa adiposa", "#EF553B"),
+        ("masa_muscular_kg", "Masa muscular", "#636EFA"),
+        ("masa_osea_kg", "Masa osea", "#00CC96"),
+        ("masa_residual_kg", "Masa residual", "#AB63FA"),
+        ("masa_piel_kg", "Masa piel", "#FFA15A"),
+    ]
+    points = []
+
+    for record in sorted_records:
+        point = {
+            "fecha": _format_record_date_label(record),
+            "grasa_pct": _safe_float(record.get("ajuste_adiposa_pct")),
+            "musculo_pct": _safe_float(record.get("ajuste_muscular_pct")),
+        }
+        has_value = point["grasa_pct"] is not None or point["musculo_pct"] is not None
+        for key, _, _ in mass_config:
+            point[key] = _safe_float(record.get(key))
+            has_value = has_value or point[key] is not None
+        if has_value:
+            points.append(point)
+
+    has_enough_data = len(points) >= 2 and (
+        sum(1 for point in points if point.get("grasa_pct") is not None) >= 2
+        or sum(1 for point in points if point.get("musculo_pct") is not None) >= 2
+        or any(sum(1 for point in points if point.get(key) is not None) >= 2 for key, _, _ in mass_config)
+    )
+
+    return {
+        "points": points,
+        "mass_series": [
+            {"key": key, "label": label, "color": color}
+            for key, label, color in mass_config
+            if any(point.get(key) is not None for point in points)
+        ],
+        "has_enough_data": has_enough_data,
+        "caption": "Evolucion historica del porcentaje graso y muscular, junto con las masas calculadas disponibles.",
+        "trends": _build_two_point_trends(
+            points,
+            [
+                {"key": "grasa_pct", "type": "grasa", "label": "porcentaje graso"},
+                {"key": "musculo_pct", "type": "musculo", "label": "porcentaje muscular"},
+            ],
+        ),
+    }
+
+
+def _build_individual_imo_chart(player_records: list[dict[str, Any]]) -> dict[str, Any]:
+    points = []
+    for record in _sort_records(player_records, reverse=False):
+        value = _safe_float(record.get("idx_musculo_oseo"))
+        if value is not None:
+            points.append({"fecha": _format_record_date_label(record), "value": round(value, 4)})
+
+    return {
+        "points": points,
+        "has_enough_data": len(points) >= 2,
+        "caption": "Evolucion historica del indice musculo-oseo. Permite seguir la relacion entre desarrollo muscular y componente oseo a lo largo del tiempo.",
+        "trends": _build_two_point_trends(points, [{"key": "value", "type": "imo"}]),
+    }
+
+
+def _build_individual_pliegues_chart(player_records: list[dict[str, Any]]) -> dict[str, Any]:
+    pliegues_config = [
+        ("pliegue_triceps", "Triceps"),
+        ("pliegue_subescapular", "Subescapular"),
+        ("pliegue_biceps", "Biceps"),
+        ("pliegue_cresta_iliaca", "Cresta iliaca"),
+        ("pliegue_supraespinal", "Supraespinal"),
+        ("pliegue_abdominal", "Abdominal"),
+        ("pliegue_muslo_frontal", "Muslo frontal"),
+        ("pliegue_pantorrilla_maxima", "Pantorrilla maxima"),
+        ("pliegue_antebrazo", "Antebrazo"),
+    ]
+    points = []
+
+    for record in _sort_records(player_records, reverse=False):
+        point = {
+            "fecha": _format_record_date_label(record),
+            "suma_6_pliegues_mm": _safe_float(record.get("suma_6_pliegues_mm")),
+        }
+        has_value = point["suma_6_pliegues_mm"] is not None
+        for key, _ in pliegues_config:
+            point[key] = _safe_float(record.get(key))
+            has_value = has_value or point[key] is not None
+        if has_value:
+            points.append(point)
+
+    pliegues = [
+        {"key": key, "label": label}
+        for key, label in pliegues_config
+        if sum(1 for point in points if point.get(key) is not None) >= 1
+    ]
+    has_enough_data = (
+        sum(1 for point in points if point.get("suma_6_pliegues_mm") is not None) >= 2
+        or any(sum(1 for point in points if point.get(item["key"]) is not None) >= 2 for item in pliegues)
+    )
+
+    return {
+        "points": points,
+        "pliegues": pliegues,
+        "has_enough_data": has_enough_data,
+        "caption": "Evolucion historica de la suma de 6 pliegues y detalle por zona anatomica disponible.",
+        "trends": _build_two_point_trends(
+            points,
+            [{"key": "suma_6_pliegues_mm", "type": "pliegues", "label": "la suma de pliegues"}],
+        ),
     }
 
 
@@ -773,6 +932,9 @@ def build_physical_individual_context(
     individual_charts = {
         "perfil_antropometrico": _build_individual_perfil_antropometrico_chart(records, selected_player_id),
         "peso_grasa": _build_individual_peso_grasa_chart(player_records),
+        "composicion_corporal": _build_individual_composicion_chart(player_records),
+        "indice_musculo_oseo": _build_individual_imo_chart(player_records),
+        "pliegues": _build_individual_pliegues_chart(player_records),
     }
 
     return {
