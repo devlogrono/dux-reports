@@ -258,6 +258,33 @@ def _build_summary(records):
     }
 
 
+def _date_key(value):
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
+
+def _build_daily_charts(records):
+    daily = {}
+    for record in records:
+        date_value = record.get("fecha_sesion")
+        if not date_value:
+            continue
+        key = _date_key(date_value)
+        daily.setdefault(key, {"wellness": [], "rpe": [], "ua": 0})
+        daily[key]["wellness"].append(record.get("wellness_score"))
+        daily[key]["rpe"].append(record.get("rpe"))
+        daily[key]["ua"] += record.get("ua") or 0
+
+    labels = sorted(daily.keys())
+    return {
+        "labels": labels,
+        "wellness": [_round_metric(_avg(daily[label]["wellness"])) for label in labels],
+        "rpe": [_round_metric(_avg(daily[label]["rpe"])) for label in labels],
+        "ua": [_round_metric(daily[label]["ua"]) for label in labels],
+    }
+
+
 @bp.get("/")
 @login_required
 @cache.cached(timeout=3600, make_cache_key=_user_cache_key)
@@ -274,6 +301,7 @@ def index():
     tipos = []
     records = []
     summary = _build_summary(records)
+    charts = _build_daily_charts(records)
 
     try:
         planteles, jugadoras, tipos = _fetch_filter_options()
@@ -284,6 +312,7 @@ def index():
             since,
         )
         summary = _build_summary(records)
+        charts = _build_daily_charts(records)
     except SQLAlchemyError:
         db.session.rollback()
         error = "No se pudieron cargar los registros de Wellness."
@@ -301,4 +330,5 @@ def index():
         records=records,
         display_records=records[:200],
         summary=summary,
+        charts=charts,
     )
