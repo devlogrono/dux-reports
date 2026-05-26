@@ -10,6 +10,14 @@ from dux import cache, db
 bp = Blueprint("dashboard_wellness", __name__, url_prefix="/dashboard/wellness")
 
 WELLNESS_COLUMNS = ["recuperacion", "energia", "sueno", "stress", "dolor"]
+PERIOD_OPTIONS = [
+    {"id": "7", "label": "Últimos 7 días", "days": 7},
+    {"id": "30", "label": "Últimos 30 días", "days": 30},
+    {"id": "90", "label": "Últimos 90 días", "days": 90},
+    {"id": "365", "label": "Últimos 365 días", "days": 365},
+]
+DEFAULT_PERIOD = "30"
+DEFAULT_PLANTEL = "1FF"
 
 
 def _user_cache_key():
@@ -45,12 +53,49 @@ def _avg(values):
     return sum(values) / len(values)
 
 
-def _selected_days():
-    try:
-        days = int(request.args.get("days", 30))
-    except (TypeError, ValueError):
-        days = 30
+def _clamp_days(days):
     return min(max(days, 1), 365)
+
+
+def _resolve_period_selection(period, days=None):
+    period_ids = {option["id"] for option in PERIOD_OPTIONS}
+    if period in period_ids:
+        selected_period = period
+    elif days:
+        try:
+            selected_period = str(_clamp_days(int(days)))
+        except (TypeError, ValueError):
+            selected_period = DEFAULT_PERIOD
+        if selected_period not in period_ids:
+            selected_period = DEFAULT_PERIOD
+    else:
+        selected_period = DEFAULT_PERIOD
+
+    selected_days = next(
+        option["days"] for option in PERIOD_OPTIONS if option["id"] == selected_period
+    )
+    return selected_period, selected_days
+
+
+def _valid_values(selected, available):
+    available_set = set(available)
+    return [value for value in selected if value in available_set]
+
+
+def _selected_planteles(selected, available):
+    valid_selected = _valid_values(selected, available)
+    if valid_selected:
+        return valid_selected
+    if DEFAULT_PLANTEL in available:
+        return [DEFAULT_PLANTEL]
+    return []
+
+
+def _filter_jugadoras_by_plantel(jugadoras, planteles):
+    if not planteles:
+        return jugadoras
+    planteles_set = set(planteles)
+    return [jugadora for jugadora in jugadoras if jugadora["plantel"] in planteles_set]
 
 
 def _fetch_filter_options():
@@ -289,22 +334,36 @@ def _build_daily_charts(records):
 @login_required
 @cache.cached(timeout=3600, make_cache_key=_user_cache_key)
 def index():
-    selected_planteles = request.args.getlist("plantel")
-    selected_jugadoras = request.args.getlist("jugadora")
-    selected_tipos = request.args.getlist("tipo")
-    days = _selected_days()
+    requested_planteles = request.args.getlist("plantel")
+    requested_jugadoras = request.args.getlist("jugadora")
+    requested_tipos = request.args.getlist("tipo")
+    selected_period, days = _resolve_period_selection(
+        request.args.get("period"),
+        request.args.get("days"),
+    )
     since = date.today() - timedelta(days=days)
 
     error = None
     planteles = []
     jugadoras = []
+    visible_jugadoras = []
     tipos = []
+    selected_planteles = []
+    selected_jugadoras = []
+    selected_tipos = []
     records = []
     summary = _build_summary(records)
     charts = _build_daily_charts(records)
 
     try:
         planteles, jugadoras, tipos = _fetch_filter_options()
+        selected_planteles = _selected_planteles(requested_planteles, planteles)
+        visible_jugadoras = _filter_jugadoras_by_plantel(jugadoras, selected_planteles)
+        selected_jugadoras = _valid_values(
+            requested_jugadoras,
+            [jugadora["id"] for jugadora in visible_jugadoras],
+        )
+        selected_tipos = _valid_values(requested_tipos, tipos)
         records = _fetch_wellness_records(
             selected_planteles,
             selected_jugadoras,
@@ -322,10 +381,13 @@ def index():
         error=error,
         planteles=planteles,
         jugadoras=jugadoras,
+        visible_jugadoras=visible_jugadoras,
         tipos=tipos,
         selected_planteles=selected_planteles,
         selected_jugadoras=selected_jugadoras,
         selected_tipos=selected_tipos,
+        period_options=PERIOD_OPTIONS,
+        selected_period=selected_period,
         days=days,
         records=records,
         display_records=records[:200],
