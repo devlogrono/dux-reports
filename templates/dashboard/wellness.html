@@ -14,6 +14,17 @@
         </div>
 
         <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-2">
+                <label for="period" class="form-label">Periodo</label>
+                <select id="period" name="period" class="form-select">
+                    {% for option in period_options %}
+                        <option value="{{ option.id }}" {% if option.id == selected_period %}selected{% endif %}>
+                            {{ option.label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
             <div class="col-md-3">
                 <label for="plantel" class="form-label">Plantel</label>
                 <select id="plantel" name="plantel" class="form-select" multiple>
@@ -28,7 +39,7 @@
             <div class="col-md-4">
                 <label for="jugadora" class="form-label">Jugadora</label>
                 <select id="jugadora" name="jugadora" class="form-select" multiple>
-                    {% for jugadora in jugadoras %}
+                    {% for jugadora in visible_jugadoras %}
                         <option value="{{ jugadora.id }}" {% if jugadora.id in selected_jugadoras %}selected{% endif %}>
                             {{ jugadora.nombre }}{% if jugadora.plantel %} · {{ jugadora.plantel }}{% endif %}
                         </option>
@@ -47,16 +58,28 @@
                 </select>
             </div>
 
-            <div class="col-md-1">
-                <label for="days" class="form-label">Días</label>
-                <input id="days" name="days" class="form-control" type="number" min="1" max="365" value="{{ days }}">
+            <div class="col-md-1 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">Filtrar</button>
             </div>
 
             <div class="col-md-2 d-flex gap-2">
-                <button type="submit" class="btn btn-primary flex-fill">Filtrar</button>
                 <a href="{{ url_for('dashboard_wellness.index') }}" class="btn btn-outline-secondary">Limpiar</a>
             </div>
         </form>
+
+        <div class="d-flex align-items-center flex-wrap gap-2 mt-3 small text-muted">
+            <span>Filtros activos:</span>
+            <span class="badge text-bg-light">{{ days }} días</span>
+            {% for plantel in selected_planteles %}
+                <span class="badge text-bg-light">Plantel {{ plantel }}</span>
+            {% endfor %}
+            {% for tipo in selected_tipos %}
+                <span class="badge text-bg-light">{{ tipo }}</span>
+            {% endfor %}
+            {% if selected_jugadoras %}
+                <span class="badge text-bg-light">{{ selected_jugadoras|length }} jugadora(s)</span>
+            {% endif %}
+        </div>
     </div>
 
     {% if error %}
