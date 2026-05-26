@@ -5,7 +5,13 @@ import tempfile
 import unittest
 
 from dux import create_app
-from dux.controllers.dashboard_wellness_controller import _build_daily_charts, _build_summary
+from dux.controllers.dashboard_wellness_controller import (
+    _build_daily_charts,
+    _build_summary,
+    _filter_jugadoras_by_plantel,
+    _resolve_period_selection,
+    _selected_planteles,
+)
 from dux.models import Base
 
 
@@ -79,6 +85,14 @@ class DashboardWellnessRouteTest(unittest.TestCase):
             VALUES ('player-1', 'Alexia', 'Test', '1FF', 'F', 1)
             """
         )
+        conn.execute(
+            """
+            INSERT INTO futbolistas (
+                identificacion, nombre, apellido, competicion, genero, id_estado
+            )
+            VALUES ('player-2', 'Patri', 'Other', '2FF', 'F', 1)
+            """
+        )
         today = date.today().isoformat()
 
         conn.execute(
@@ -94,6 +108,20 @@ class DashboardWellnessRouteTest(unittest.TestCase):
             )
             """,
             (today, f"{today} 09:00:00"),
+        )
+        conn.execute(
+            """
+            INSERT INTO wellness (
+                id, id_jugadora, fecha_sesion, tipo, turno, recuperacion, fatiga,
+                sueno, stress, dolor, minutos_sesion, rpe, ua, observacion,
+                fecha_hora_registro, usuario, estatus_id
+            )
+            VALUES (
+                2, 'player-2', ?, 'checkOut', 'mañana', 1, 1,
+                1, 1, 1, 60, 4, 240, '', ?, 'test', 2
+            )
+            """,
+            (today, f"{today} 10:00:00"),
         )
         conn.commit()
         conn.close()
@@ -129,9 +157,26 @@ class DashboardWellnessRouteTest(unittest.TestCase):
         self.assertIn(b"15.0/25", response.data)
         self.assertIn(b"0/1", response.data)
         self.assertIn(b"300.0", response.data)
+        self.assertIn(b"Filtros activos", response.data)
+        self.assertIn(b"30 d\xc3\xadas", response.data)
+        self.assertNotIn(b"Other, Patri", response.data)
         self.assertIn(b'id="chart-wellness"', response.data)
         self.assertIn(b'id="chart-rpe"', response.data)
         self.assertIn(b'id="chart-ua"', response.data)
+
+    def test_dashboard_wellness_route_applies_selected_plantel(self):
+        with self.client.session_transaction() as session:
+            session["_user_id"] = "test-user"
+            session["_fresh"] = True
+
+        response = self.client.get("/dashboard/wellness/?plantel=2FF&period=7")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Other, Patri", response.data)
+        self.assertIn(b"2FF", response.data)
+        self.assertIn(b"5.0/25", response.data)
+        self.assertIn(b"7 d\xc3\xadas", response.data)
+        self.assertNotIn(b"Test, Alexia", response.data)
 
     def test_build_summary_uses_legacy_wellness_kpis(self):
         records = [
@@ -203,6 +248,25 @@ class DashboardWellnessRouteTest(unittest.TestCase):
         self.assertEqual(charts["wellness"], [15.0, 15.0])
         self.assertEqual(charts["rpe"], [5.0, 5.0])
         self.assertEqual(charts["ua"], [560, 300])
+
+    def test_filter_helpers_resolve_defaults_and_visible_players(self):
+        self.assertEqual(_resolve_period_selection(None), ("30", 30))
+        self.assertEqual(_resolve_period_selection("90"), ("90", 90))
+        self.assertEqual(_resolve_period_selection("unknown", "365"), ("365", 365))
+        self.assertEqual(_resolve_period_selection("unknown", "999"), ("365", 365))
+
+        self.assertEqual(_selected_planteles([], ["2FF", "1FF"]), ["1FF"])
+        self.assertEqual(_selected_planteles(["2FF"], ["2FF", "1FF"]), ["2FF"])
+        self.assertEqual(_selected_planteles(["invalid"], ["2FF"]), [])
+
+        jugadoras = [
+            {"id": "player-1", "plantel": "1FF"},
+            {"id": "player-2", "plantel": "2FF"},
+        ]
+        self.assertEqual(
+            _filter_jugadoras_by_plantel(jugadoras, ["1FF"]),
+            [{"id": "player-1", "plantel": "1FF"}],
+        )
 
 
 if __name__ == "__main__":
