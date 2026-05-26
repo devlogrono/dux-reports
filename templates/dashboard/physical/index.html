@@ -59,6 +59,57 @@
     font-size: .82rem;
     font-weight: 700;
   }
+
+  .quick-access-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 135px;
+    border: 1px solid rgba(13, 110, 253, .14);
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, .96);
+    color: #111827;
+    text-decoration: none;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.10);
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  }
+
+  .quick-access-card:hover {
+    color: #111827;
+    border-color: rgba(13, 110, 253, .45);
+    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.16);
+    transform: translateY(-2px);
+  }
+
+  .quick-access-card.disabled {
+    color: #6c757d;
+    cursor: not-allowed;
+    opacity: .78;
+  }
+
+  .quick-access-card.disabled:hover {
+    border-color: rgba(108, 117, 125, .2);
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.10);
+    transform: none;
+  }
+
+  .quick-access-title {
+    font-size: 1.05rem;
+    font-weight: 800;
+  }
+
+  .quick-access-meta {
+    font-size: .85rem;
+    color: #6c757d;
+  }
+
+  .clickable-row {
+    cursor: pointer;
+  }
+
+  .clickable-row:hover {
+    background-color: rgba(13, 110, 253, .08);
+  }
 </style>
 {% endblock %}
 
@@ -93,6 +144,50 @@
           </a>
         {% endif %}
       </form>
+    </div>
+  </div>
+
+  <div class="physical-card p-4 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+      <div>
+        <h4 class="section-title mb-1">Accesos rapidos</h4>
+        <p class="text-muted mb-0">Elige el modo de analisis del modulo Physical.</p>
+      </div>
+      {% if plantel %}
+        <span class="badge bg-light text-dark border">Plantel {{ plantel }}</span>
+      {% endif %}
+    </div>
+
+    <div class="row g-3">
+      <div class="col-12 col-md-4">
+        <a class="quick-access-card p-3" href="{{ url_for('dashboard_physical.grupal', plantel=plantel) }}">
+          <div>
+            <div class="quick-access-title">Analisis grupal</div>
+            <div class="quick-access-meta mt-1">KPIs, interpretacion y graficos por plantel.</div>
+          </div>
+          <div class="fw-semibold text-primary mt-3">Abrir grupal</div>
+        </a>
+      </div>
+
+      <div class="col-12 col-md-4">
+        <a class="quick-access-card p-3" href="{{ url_for('dashboard_physical.individual', plantel=plantel) }}">
+          <div>
+            <div class="quick-access-title">Analisis individual</div>
+            <div class="quick-access-meta mt-1">Ficha, historial y evolucion por jugadora.</div>
+          </div>
+          <div class="fw-semibold text-primary mt-3">Abrir individual</div>
+        </a>
+      </div>
+
+      <div class="col-12 col-md-4">
+        <a class="quick-access-card disabled p-3" href="#" aria-disabled="true" tabindex="-1">
+          <div>
+            <div class="quick-access-title">Registro</div>
+            <div class="quick-access-meta mt-1">Carga de nuevas mediciones ISAK.</div>
+          </div>
+          <div class="fw-semibold text-muted mt-3">Pendiente</div>
+        </a>
+      </div>
     </div>
   </div>
 
@@ -183,7 +278,13 @@
           </thead>
           <tbody>
             {% for row in recent_worsening_rows %}
-              <tr>
+              <tr
+                {% if row.identificacion %}
+                  class="clickable-row"
+                  data-href="{{ url_for('dashboard_physical.individual', plantel=plantel, jugadora=row.identificacion) }}"
+                  title="Ver perfil individual"
+                {% endif %}
+              >
                 <td>{{ row.jugadora }}</td>
                 <td>{{ row.n_metricas }}</td>
                 <td>{% if row.grasa %}<span class="text-danger fw-semibold">{{ row.grasa }}</span>{% else %}-{% endif %}</td>
@@ -207,12 +308,6 @@
       <div>
         <h4 class="section-title mb-1">Últimos registros</h4>
         <p class="text-muted mb-0">Primer bloque migrado desde la app Physical de Streamlit.</p>
-      </div>
-
-      <div class="d-flex gap-2">
-        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('dashboard_physical.grupal', plantel=plantel) }}">Grupal</a>
-        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('dashboard_physical.individual', plantel=plantel) }}">Individual</a>
-        <a class="btn btn-outline-secondary btn-sm disabled" href="#">Registro</a>
       </div>
     </div>
 
@@ -251,4 +346,17 @@
   </div>
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".clickable-row[data-href]").forEach(function (row) {
+      row.addEventListener("click", function () {
+        window.location.href = row.dataset.href;
+      });
+    });
+  });
+</script>
 {% endblock %}

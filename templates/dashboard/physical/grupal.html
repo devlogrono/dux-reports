@@ -128,12 +128,9 @@
     color: #fff !important;
   }
 
-  .status-text.status-success { color: #198754 !important; }
-  .status-text.status-excellent { color: #0F766E !important; }
-  .status-text.status-excellent::before { content: "★ "; }
-  .status-text.status-warning { color: #B45309 !important; }
-  .status-text.status-danger { color: #DC3545 !important; }
-  .status-text.status-secondary { color: #6c757d !important; }
+  .status-badge.status-excellent::before {
+    content: "★ " !important;
+  }
 </style>
 {% endblock %}
 
@@ -245,6 +242,36 @@
   </div>
 
   <div class="physical-card p-4 mb-4">
+    <h4 class="section-title mb-3">Resumen tecnico:</h4>
+    <p class="mb-2">
+      El grupo presenta un peso medio de
+      <strong>{{ fmt_value(technical_summary.peso_medio.value, technical_summary.peso_medio.decimals, technical_summary.peso_medio.unit) }}</strong>,
+      con porcentaje de grasa
+      <span class="badge status-badge status-{{ technical_summary.grasa_media.status_class }}">
+        {{ technical_summary.grasa_media.status|lower }}
+      </span>
+      ({{ fmt_value(technical_summary.grasa_media.value, technical_summary.grasa_media.decimals, technical_summary.grasa_media.unit) }})
+      y porcentaje muscular
+      <span class="badge status-badge status-{{ technical_summary.musculo_medio.status_class }}">
+        {{ technical_summary.musculo_medio.status|lower }}
+      </span>
+      ({{ fmt_value(technical_summary.musculo_medio.value, technical_summary.musculo_medio.decimals, technical_summary.musculo_medio.unit) }}).
+    </p>
+    <p class="mb-0">
+      El indice musculo / oseo medio se situa en nivel
+      <span class="badge status-badge status-{{ technical_summary.imo_medio.status_class }}">
+        {{ technical_summary.imo_medio.status|lower }}
+      </span>
+      ({{ fmt_value(technical_summary.imo_medio.value, technical_summary.imo_medio.decimals, technical_summary.imo_medio.unit) }}),
+      mientras que la suma de 6 pliegues refleja un perfil
+      <span class="badge status-badge status-{{ technical_summary.pliegues_media.status_class }}">
+        {{ technical_summary.pliegues_media.status|lower }}
+      </span>
+      ({{ fmt_value(technical_summary.pliegues_media.value, technical_summary.pliegues_media.decimals, technical_summary.pliegues_media.unit) }}).
+    </p>
+  </div>
+
+  <div class="physical-card p-4 mb-4">
     <h4 class="section-title mb-3">Interpretacion de metricas</h4>
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">
@@ -321,26 +348,6 @@
         {% endfor %}
       </div>
     </div>
-  </div>
-
-  <div class="physical-card p-4 mb-4">
-    <h4 class="section-title mb-2">Resumen tecnico</h4>
-    <p class="mb-0 text-muted">
-      El grupo presenta un peso medio de
-      <strong>{{ fmt_value(technical_summary.peso_medio.value, technical_summary.peso_medio.decimals, technical_summary.peso_medio.unit) }}</strong>,
-      con porcentaje de grasa
-      <strong class="status-text status-{{ technical_summary.grasa_media.status_class }}">{{ technical_summary.grasa_media.status|lower }}</strong>
-      ({{ fmt_value(technical_summary.grasa_media.value, technical_summary.grasa_media.decimals, technical_summary.grasa_media.unit) }})
-      y porcentaje muscular
-      <strong class="status-text status-{{ technical_summary.musculo_medio.status_class }}">{{ technical_summary.musculo_medio.status|lower }}</strong>
-      ({{ fmt_value(technical_summary.musculo_medio.value, technical_summary.musculo_medio.decimals, technical_summary.musculo_medio.unit) }}).
-      El indice musculo / oseo medio se situa en nivel
-      <strong class="status-text status-{{ technical_summary.imo_medio.status_class }}">{{ technical_summary.imo_medio.status|lower }}</strong>
-      ({{ fmt_value(technical_summary.imo_medio.value, technical_summary.imo_medio.decimals, technical_summary.imo_medio.unit) }}),
-      mientras que la suma de 6 pliegues refleja un perfil
-      <strong class="status-text status-{{ technical_summary.pliegues_media.status_class }}">{{ technical_summary.pliegues_media.status|lower }}</strong>
-      ({{ fmt_value(technical_summary.pliegues_media.value, technical_summary.pliegues_media.decimals, technical_summary.pliegues_media.unit) }}).
-    </p>
   </div>
 
   <div class="physical-card p-4 mb-4">

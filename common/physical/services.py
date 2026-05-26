@@ -568,6 +568,108 @@ def _build_individual_interpretation(kpis: list[dict[str, Any]]) -> list[dict[st
     return [by_key[key] for key in order if key in by_key]
 
 
+def _change_intensity(delta_pct: float | None) -> str:
+    if delta_pct is None:
+        return ""
+    abs_delta = abs(delta_pct)
+    if abs_delta < 2:
+        return "ligero"
+    if abs_delta < 5:
+        return "moderado"
+    return "marcado"
+
+
+def _technical_summary_status(metric_key: str, value: float | None) -> dict[str, Any]:
+    status, status_class, _ = _individual_metric_status(metric_key, value)
+    return {
+        "key": metric_key,
+        "status": status.lower(),
+        "status_class": status_class,
+    }
+
+
+def _build_individual_technical_summary(
+    latest_record: dict[str, Any] | None,
+    previous_record: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not latest_record:
+        return {
+            "metrics": {},
+            "changes": ["sin comparacion previa suficiente"],
+            "change_text": "sin comparacion previa suficiente",
+            "has_previous": False,
+        }
+
+    metric_sources = {
+        "grasa": "ajuste_adiposa_pct",
+        "musculo": "ajuste_muscular_pct",
+        "imo": "idx_musculo_oseo",
+        "pliegues": "suma_6_pliegues_mm",
+    }
+    metrics = {
+        key: _technical_summary_status(key, _safe_float(latest_record.get(source)))
+        for key, source in metric_sources.items()
+    }
+
+    changes = []
+    if previous_record:
+        current_grasa = _safe_float(latest_record.get("ajuste_adiposa_pct"))
+        previous_grasa = _safe_float(previous_record.get("ajuste_adiposa_pct"))
+        delta_grasa = _metric_delta_pct(current_grasa, previous_grasa)
+        if delta_grasa is not None:
+            intensity = _change_intensity(delta_grasa)
+            if current_grasa < previous_grasa:
+                changes.append(f"{intensity} mejora en grasa corporal")
+            elif current_grasa > previous_grasa:
+                changes.append(f"{intensity} empeoramiento en grasa corporal")
+            else:
+                changes.append("estabilidad en grasa corporal")
+
+        current_muscle = _safe_float(latest_record.get("ajuste_muscular_pct"))
+        previous_muscle = _safe_float(previous_record.get("ajuste_muscular_pct"))
+        delta_muscle = _metric_delta_pct(current_muscle, previous_muscle)
+        if delta_muscle is not None:
+            intensity = _change_intensity(delta_muscle)
+            if current_muscle > previous_muscle:
+                changes.append(f"{intensity} mejora muscular")
+            elif current_muscle < previous_muscle:
+                changes.append(f"{intensity} descenso muscular")
+            else:
+                changes.append("estabilidad muscular")
+
+        current_pliegues = _safe_float(latest_record.get("suma_6_pliegues_mm"))
+        previous_pliegues = _safe_float(previous_record.get("suma_6_pliegues_mm"))
+        delta_pliegues = _metric_delta_pct(current_pliegues, previous_pliegues)
+        if delta_pliegues is not None:
+            intensity = _change_intensity(delta_pliegues)
+            if current_pliegues < previous_pliegues:
+                changes.append(f"{intensity} reduccion de pliegues")
+            elif current_pliegues > previous_pliegues:
+                changes.append(f"{intensity} aumento de pliegues")
+            else:
+                changes.append("estabilidad en pliegues")
+
+        current_imo = _safe_float(latest_record.get("idx_musculo_oseo"))
+        previous_imo = _safe_float(previous_record.get("idx_musculo_oseo"))
+        delta_imo = _metric_delta_pct(current_imo, previous_imo)
+        if delta_imo is not None:
+            intensity = _change_intensity(delta_imo)
+            if current_imo > previous_imo:
+                changes.append(f"{intensity} mejora del indice musculo-oseo")
+            elif current_imo < previous_imo:
+                changes.append(f"{intensity} descenso del indice musculo-oseo")
+            else:
+                changes.append("estabilidad del indice musculo-oseo")
+
+    selected_changes = changes[:3] if changes else ["sin comparacion previa suficiente"]
+    return {
+        "metrics": metrics,
+        "changes": selected_changes,
+        "change_text": ", ".join(selected_changes),
+        "has_previous": previous_record is not None and bool(changes),
+    }
+
+
 def _format_record_date_label(record: dict[str, Any]) -> str:
     date_value = _coerce_date_value(record.get("fecha_medicion"))
     if date_value is not None:
@@ -645,6 +747,15 @@ def _trend_sentence(metric: str, delta: float | None, label_override: str | None
             return f"{label} de {metric_label} ({delta:+.1f} mm)"
         label = "Ligera reduccion" if abs(delta) < threshold_marked else "Reduccion marcada"
         return f"{label} de {metric_label} ({delta:+.1f} mm)"
+
+    if metric == "ratio":
+        if abs(delta) < 0.01:
+            return f"Estabilidad del ratio ({delta:+.3f})"
+        if delta > 0:
+            label = "Ligero aumento" if abs(delta) < 0.03 else "Aumento marcado"
+            return f"{label} del ratio ({delta:+.3f})"
+        label = "Ligera reduccion" if abs(delta) < 0.03 else "Reduccion marcada"
+        return f"{label} del ratio ({delta:+.3f})"
 
     if abs(delta) < 0.8:
         return f"Estabilidad del peso corporal ({delta:+.1f} kg)"
@@ -852,6 +963,215 @@ def _build_individual_pliegues_chart(player_records: list[dict[str, Any]]) -> di
     }
 
 
+def _ratio_value(record: dict[str, Any], numerator_key: str, denominator_key: str) -> float | None:
+    numerator = _safe_float(record.get(numerator_key))
+    denominator = _safe_float(record.get(denominator_key))
+    if numerator is None or denominator is None or denominator == 0:
+        return None
+    return numerator / denominator
+
+
+def _structural_ratio_config() -> list[dict[str, str]]:
+    return [
+        {
+            "key": "ratio_cintura_cadera",
+            "label": "Ratio cintura / cadera",
+            "short_label": "Cintura / cadera",
+            "numerator": "perimetro_cintura_minima",
+            "denominator": "perimetro_cadera_maximo",
+            "help": "Relacion entre cintura minima y cadera maxima.",
+        },
+        {
+            "key": "ratio_muslo_pantorrilla",
+            "label": "Ratio muslo / pantorrilla",
+            "short_label": "Muslo / pantorrilla",
+            "numerator": "perimetro_muslo_maximo",
+            "denominator": "perimetro_pantorrilla_maxima",
+            "help": "Relacion entre perimetro de muslo maximo y pantorrilla maxima.",
+        },
+        {
+            "key": "ratio_envergadura_talla",
+            "label": "Ratio envergadura / talla",
+            "short_label": "Envergadura / talla",
+            "numerator": "envergadura_cm",
+            "denominator": "talla_corporal_cm",
+            "help": "Relacion entre envergadura y talla corporal.",
+        },
+        {
+            "key": "ratio_tronco_altura",
+            "label": "Ratio tronco / altura",
+            "short_label": "Tronco / altura",
+            "numerator": "talla_sentado_cm",
+            "denominator": "talla_corporal_cm",
+            "help": "Relacion entre talla sentado y talla corporal.",
+        },
+    ]
+
+
+def _build_structural_map(records: list[dict[str, Any]], selected_player_id: str | None) -> dict[str, Any]:
+    latest_records = _latest_records_by_player(records)
+    raw_points = []
+
+    for record in latest_records:
+        x_value = _ratio_value(record, "envergadura_cm", "talla_corporal_cm")
+        y_value = _ratio_value(record, "perimetro_muslo_maximo", "perimetro_pantorrilla_maxima")
+        if x_value is None or y_value is None:
+            continue
+        raw_points.append(
+            {
+                "identificacion": record.get("identificacion"),
+                "jugadora": str(record.get("nombre_jugadora") or "").strip(),
+                "x": x_value,
+                "y": y_value,
+            }
+        )
+
+    if not raw_points:
+        return {"points": [], "highlighted": None, "x_cut": None, "y_cut": None, "x_range": None, "y_range": None}
+
+    x_cut = _mean([point["x"] for point in raw_points]) or 0
+    y_cut = _mean([point["y"] for point in raw_points]) or 0
+    points = []
+    highlighted = None
+
+    for point in raw_points:
+        x_value = point["x"]
+        y_value = point["y"]
+        if x_value >= x_cut and y_value >= y_cut:
+            group, color = "G1", "#2ECC71"
+        elif x_value < x_cut and y_value >= y_cut:
+            group, color = "G2", "#F1C40F"
+        elif x_value < x_cut and y_value < y_cut:
+            group, color = "G3", "#F39C12"
+        else:
+            group, color = "G4", "#E74C3C"
+
+        is_highlighted = selected_player_id is not None and str(point.get("identificacion")) == str(selected_player_id)
+        chart_point = {
+            "identificacion": point.get("identificacion"),
+            "jugadora": point["jugadora"],
+            "x": round(x_value, 4),
+            "y": round(y_value, 4),
+            "grupo": group,
+            "color": color,
+            "highlighted": is_highlighted,
+            "label": f"{point['jugadora'].title()} ({x_value:.3f}; {y_value:.3f})",
+        }
+        points.append(chart_point)
+        if is_highlighted:
+            highlighted = chart_point
+
+    x_values = [point["x"] for point in points]
+    y_values = [point["y"] for point in points]
+    return {
+        "points": points,
+        "highlighted": highlighted,
+        "x_cut": round(x_cut, 4),
+        "y_cut": round(y_cut, 4),
+        "x_range": [round(min(x_values) - 0.02, 4), round(max(x_values) + 0.02, 4)],
+        "y_range": [round(min(y_values) - 0.05, 4), round(max(y_values) + 0.05, 4)],
+    }
+
+
+def _structural_group_interpretation(group: str | None) -> str:
+    if group == "G1":
+        return "Perfil con mayor envergadura relativa y buen desarrollo de tren inferior. Compatible con una estructura favorable para amplitud gestual y produccion de fuerza."
+    if group == "G2":
+        return "Perfil mas compacto, con predominio relativo del tren inferior. Puede asociarse a buena base de fuerza en una estructura menos longilinea."
+    if group == "G3":
+        return "Perfil mas ligero, con menor envergadura relativa y menor desarrollo del tren inferior. Puede existir margen de mejora estructural y funcional."
+    if group == "G4":
+        return "Perfil mas longilineo, con menor desarrollo relativo del tren inferior. El foco puede estar en reforzar la base estructural y la capacidad de fuerza."
+    return "Sin datos suficientes para interpretar el perfil estructural."
+
+
+def _build_structural_interpretation(structural_map: dict[str, Any]) -> dict[str, Any]:
+    highlighted = structural_map.get("highlighted")
+    if not highlighted:
+        return {
+            "has_data": False,
+            "group": None,
+            "color": "#6c757d",
+            "ratio_envergadura_talla": None,
+            "ratio_muslo_pantorrilla": None,
+            "text": _structural_group_interpretation(None),
+        }
+
+    group = highlighted.get("grupo")
+    return {
+        "has_data": True,
+        "group": group,
+        "color": highlighted.get("color") or "#34495E",
+        "ratio_envergadura_talla": highlighted.get("x"),
+        "ratio_muslo_pantorrilla": highlighted.get("y"),
+        "text": _structural_group_interpretation(group),
+    }
+
+
+def _build_individual_perfil_estructural_chart(
+    records: list[dict[str, Any]],
+    player_records: list[dict[str, Any]],
+    selected_player_id: str | None,
+) -> dict[str, Any]:
+    sorted_records = _sort_records(player_records, reverse=False)
+    ratio_config = _structural_ratio_config()
+    points = []
+
+    for record in sorted_records:
+        point = {"fecha": _format_record_date_label(record)}
+        has_value = False
+        for config in ratio_config:
+            value = _ratio_value(record, config["numerator"], config["denominator"])
+            point[config["key"]] = round(value, 4) if value is not None else None
+            has_value = has_value or value is not None
+        if has_value:
+            points.append(point)
+
+    ratio_series = [
+        {
+            "key": config["key"],
+            "label": config["label"],
+            "short_label": config["short_label"],
+            "help": config["help"],
+        }
+        for config in ratio_config
+        if any(point.get(config["key"]) is not None for point in points)
+    ]
+
+    latest = points[-1] if points else None
+    previous = points[-2] if len(points) >= 2 else None
+    ratio_cards = []
+    for series in ratio_series:
+        current_value = latest.get(series["key"]) if latest else None
+        previous_value = previous.get(series["key"]) if previous else None
+        ratio_cards.append(
+            {
+                **series,
+                "value": current_value,
+                "delta": current_value - previous_value if current_value is not None and previous_value is not None else None,
+            }
+        )
+
+    trends = _build_two_point_trends(
+        points,
+        [{"key": series["key"], "type": "ratio", "label": series["label"]} for series in ratio_series],
+    )
+    structural_map = _build_structural_map(records, selected_player_id)
+    interpretation = _build_structural_interpretation(structural_map)
+
+    return {
+        "points": points,
+        "ratios": ratio_series,
+        "cards": ratio_cards,
+        "map": structural_map,
+        "interpretation": interpretation,
+        "has_enough_data": bool(ratio_series) or bool(structural_map.get("highlighted")),
+        "caption": "Ratios estructurales actuales y evolucion historica de proporciones corporales relevantes para el perfil fisico.",
+        "map_caption": "Mapa estructural individual dentro del grupo: eje X envergadura/talla y eje Y muslo/pantorrilla.",
+        "trends": trends,
+    }
+
+
 def build_physical_individual_context(
     plantel: str | None = None,
     jugadora: str | None = None,
@@ -929,12 +1249,14 @@ def build_physical_individual_context(
         player_photo_url = None
 
     individual_kpis = _build_individual_kpis(latest_record, previous_record, len(player_records))
+    individual_technical_summary = _build_individual_technical_summary(latest_record, previous_record)
     individual_charts = {
         "perfil_antropometrico": _build_individual_perfil_antropometrico_chart(records, selected_player_id),
         "peso_grasa": _build_individual_peso_grasa_chart(player_records),
         "composicion_corporal": _build_individual_composicion_chart(player_records),
         "indice_musculo_oseo": _build_individual_imo_chart(player_records),
         "pliegues": _build_individual_pliegues_chart(player_records),
+        "perfil_estructural": _build_individual_perfil_estructural_chart(records, player_records, selected_player_id),
     }
 
     return {
@@ -951,6 +1273,7 @@ def build_physical_individual_context(
         "latest_record": latest_record,
         "previous_record": previous_record,
         "individual_kpis": individual_kpis,
+        "individual_technical_summary": individual_technical_summary,
         "individual_charts": individual_charts,
         "interpretation_rows": _build_individual_interpretation(individual_kpis),
         "reference_ranges": _reference_ranges(),
