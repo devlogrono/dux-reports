@@ -13,6 +13,7 @@ from dux.common.physical.registration import (
     split_registration_payload,
     validate_registration_record,
 )
+from dux.common.physical.registration_file import build_registration_record_from_file
 from dux.common.physical.services import (
     build_physical_grupal_context,
     build_physical_index_context,
@@ -113,15 +114,106 @@ def registro():
                 "payload": payload,
             }
 
-    elif request.method == "POST":
-        validation_result = {
-            "submitted": True,
-            "action": "save",
-            "is_valid": False,
-            "errors": ["El guardado de archivo todavia no esta implementado."],
-            "record": {},
-            "payload": None,
-        }
+    elif request.method == "POST" and tipo_registro == "archivo":
+        action = request.form.get("registration_action") or "validate_file"
+        file_analysis = None
+        file_rows = []
+        file_sheets = []
+        file_sheet = None
+
+        if action == "save_file_record":
+            record = build_registration_record_from_form(request.form, current_user)
+            normalized_record = normalize_registration_record(record)
+            is_valid, errors = validate_registration_record(normalized_record)
+            payload = split_registration_payload(normalized_record) if is_valid else None
+
+            if is_valid:
+                try:
+                    save_registration_record(normalized_record)
+                except Exception as exc:
+                    validation_result = {
+                        "submitted": True,
+                        "action": action,
+                        "is_valid": False,
+                        "errors": [f"Error guardando ISAK desde archivo: {exc}"],
+                        "record": normalized_record,
+                        "payload": payload,
+                    }
+                else:
+                    flash("Registro ISAK importado desde archivo y guardado correctamente.", "success")
+                    return redirect(
+                        url_for(
+                            "dashboard_physical.individual",
+                            plantel=plantel,
+                            jugadora=normalized_record.get("id_jugadora"),
+                        )
+                    )
+            else:
+                validation_result = {
+                    "submitted": True,
+                    "action": action,
+                    "is_valid": False,
+                    "errors": errors,
+                    "record": normalized_record,
+                    "payload": payload,
+                }
+        else:
+            uploaded_file = request.files.get("registro_archivo")
+            if not uploaded_file or not uploaded_file.filename:
+                validation_result = {
+                    "submitted": True,
+                    "action": action,
+                    "is_valid": False,
+                    "errors": ["Selecciona un archivo .xlsx para prevalidar."],
+                    "record": {},
+                    "payload": None,
+                }
+            else:
+                base_record = build_registration_record_from_form(request.form, current_user)
+                try:
+                    file_result = build_registration_record_from_file(
+                        uploaded_file,
+                        request.form.get("registro_hoja"),
+                        base_record,
+                        current_user,
+                    )
+                    file_analysis = file_result["analysis"]
+                    file_rows = file_result["rows"]
+                    file_sheets = file_result["sheets"]
+                    file_sheet = file_result["selected_sheet"]
+                    normalized_record = normalize_registration_record(file_result["record"])
+                    is_valid, errors = validate_registration_record(normalized_record)
+                    if not file_analysis["is_valid"]:
+                        errors.insert(
+                            0,
+                            (
+                                "Cobertura insuficiente del archivo ISAK: "
+                                f"{file_analysis['matched_count']} de {file_analysis['total_fields']} campos reconocidos."
+                            ),
+                        )
+                    is_valid = is_valid and file_analysis["is_valid"]
+                    payload = split_registration_payload(normalized_record) if is_valid else None
+                    validation_result = {
+                        "submitted": True,
+                        "action": action,
+                        "is_valid": is_valid,
+                        "errors": errors,
+                        "record": normalized_record,
+                        "payload": payload,
+                        "file_analysis": file_analysis,
+                        "file_rows": file_rows,
+                        "file_sheets": file_sheets,
+                        "file_sheet": file_sheet,
+                    }
+                except ValueError as exc:
+                    validation_result = {
+                        "submitted": True,
+                        "action": action,
+                        "is_valid": False,
+                        "errors": [str(exc)],
+                        "record": base_record,
+                        "payload": None,
+                    }
 
     context = build_physical_registro_context(
         plantel=plantel,

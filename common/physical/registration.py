@@ -133,6 +133,7 @@ def _user_label(current_user) -> str | None:
 def build_registration_record_from_form(form: Mapping[str, Any], current_user) -> dict[str, Any]:
     record = {field: form.get(field) for field in REGISTRATION_FIELDS}
     record["id_jugadora"] = form.get("id_jugadora") or form.get("jugadora")
+    record["fecha_medicion"] = record.get("fecha_medicion") or date.today().isoformat()
     record["_modo"] = (form.get("_modo") or "COMPLETO").upper()
     record["tipo_isak"] = "COMPLETO"
     record["metodo"] = "ISAK"

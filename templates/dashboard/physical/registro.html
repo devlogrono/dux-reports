@@ -23,8 +23,8 @@
   }
 
   .player-avatar {
-    width: 72px;
-    height: 72px;
+    width: 96px;
+    height: 96px;
     display: grid;
     place-items: center;
     border-radius: 1rem;
@@ -33,6 +33,44 @@
     font-size: 2rem;
     font-weight: 800;
     box-shadow: inset 0 0 0 1px rgba(15,23,42,.08);
+  }
+
+  .registro-player-card {
+    min-height: 236px;
+  }
+
+  .registro-photo-shell {
+    width: min(190px, 36vw);
+    height: 220px;
+    border-radius: 1rem;
+    overflow: hidden;
+    background: #f1f5f9;
+    box-shadow: inset 0 0 0 1px rgba(15,23,42,.08);
+    flex: 0 0 auto;
+  }
+
+  .registro-player-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .registro-avatar-fallback {
+    width: 100%;
+    height: 100%;
+    border-radius: 1rem;
+    font-size: 4rem;
+  }
+
+  .player-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .75rem 1.25rem;
+  }
+
+  .player-meta-item {
+    min-width: 0;
   }
 
   .form-section {
@@ -52,6 +90,11 @@
     background: rgba(13,110,253,.04);
   }
 
+  .upload-help {
+    color: #64748b;
+    font-weight: 600;
+  }
+
   .preview-empty {
     border: 1px dashed rgba(108,117,125,.35);
     border-radius: 1rem;
@@ -66,6 +109,21 @@
   .validation-list {
     margin-bottom: 0;
   }
+
+  @media (max-width: 767.98px) {
+    .registro-player-card {
+      min-height: 0;
+    }
+
+    .registro-photo-shell {
+      width: 128px;
+      height: 160px;
+    }
+
+    .player-meta-grid {
+      grid-template-columns: 1fr;
+    }
+  }
 </style>
 {% endblock %}
 
@@ -77,7 +135,7 @@
       <div>
         <h1 class="section-title mb-1">Physical - Registro</h1>
         <p class="text-muted mb-0">
-          Formulario ISAK preparado para captura visual. Sin guardado en base de datos.
+          Registro ISAK por formulario o importacion vertical desde Excel.
         </p>
       </div>
 
@@ -137,11 +195,6 @@
     </div>
   </div>
 
-  <div class="alert alert-warning border-0 shadow-sm mb-4">
-    <strong>Guardado activo solo para Formulario:</strong>
-    el modo Archivo sigue pendiente de conexion y no se procesa.
-  </div>
-
   <div class="alert {% if modo_registro == 'SEGUIMIENTO' %}alert-info{% else %}alert-success{% endif %} border-0 shadow-sm mb-4">
     <strong>{{ modo_registro_label }}.</strong>
     {% if modo_registro == "SEGUIMIENTO" %}
@@ -154,7 +207,7 @@
   {% if validation_result and validation_result.submitted %}
     {% if validation_result.is_valid %}
       <div class="alert alert-success border-0 shadow-sm mb-4">
-        <strong>Formulario listo para guardar.</strong>
+        <strong>{% if tipo_registro == "archivo" %}Archivo listo para guardar.{% else %}Formulario listo para guardar.{% endif %}</strong>
         Validacion completada. Pulsa Guardar medicion para insertar el registro ISAK.
       </div>
     {% else %}
@@ -170,35 +223,66 @@
   {% endif %}
 
   {% if selected_player %}
-    <div class="physical-card p-4 mb-4">
-      <div class="d-flex flex-wrap align-items-center gap-3">
-        <div class="player-avatar">
-          {{ (selected_player.nombre or "?")[:1]|upper }}
-        </div>
-        <div class="flex-grow-1">
-          <div class="kpi-label">Jugadora seleccionada</div>
-          <h3 class="section-title mb-1">{{ selected_player.nombre }}</h3>
-          <div class="text-muted">
-            {% if selected_player.dorsal %}Dorsal {{ selected_player.dorsal }} - {% endif %}
-            ID {{ selected_player.id }}
-            {% if selected_player.plantel %} - Plantel {{ selected_player.plantel }}{% endif %}
-          </div>
-          <div class="small text-muted mt-1">
-            {% if selected_player.posicion %}{{ selected_player.posicion }}{% else %}Posicion no disponible{% endif %}
-            {% if selected_player.nacionalidad %} - {{ selected_player.nacionalidad }}{% endif %}
-            {% if selected_player.edad %} - {{ selected_player.edad }} anos{% endif %}
+    <div class="physical-card registro-player-card p-3 p-md-4 mb-4">
+      <div class="d-flex flex-column flex-md-row align-items-start gap-3 gap-md-4">
+        <div class="registro-photo-shell">
+          <img
+            src="{{ url_for('dashboard_physical.player_photo', identificacion=selected_player.id) }}"
+            alt="{{ selected_player.nombre }}"
+            class="registro-player-photo"
+            onerror="this.classList.add('d-none'); this.nextElementSibling.classList.remove('d-none');"
+          >
+          <div class="player-avatar registro-avatar-fallback d-none">
+            {{ (selected_player.nombre or "?")[:1]|upper }}
           </div>
         </div>
-        <div class="text-lg-end">
-          <div class="kpi-label">Ultimo registro</div>
-          <div class="fw-semibold">
-            {% if latest_record %}
-              {{ latest_record.fecha_medicion or "-" }}
-            {% else %}
-              Sin registros previos
-            {% endif %}
+
+        <div class="flex-grow-1 w-100">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <div class="kpi-label">Jugadora seleccionada</div>
+              <h3 class="section-title mb-1">{{ selected_player.nombre }}</h3>
+              <div class="d-flex flex-wrap gap-2">
+                {% if selected_player.dorsal %}
+                  <span class="badge bg-primary">Dorsal {{ selected_player.dorsal }}</span>
+                {% endif %}
+                <span class="badge bg-light text-dark border">ID {{ selected_player.id }}</span>
+                {% if selected_player.plantel %}
+                  <span class="badge bg-light text-dark border">{{ selected_player.plantel }}</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="text-md-end">
+              <div class="kpi-label">Ultimo registro</div>
+              <div class="fw-semibold">
+                {% if latest_record %}
+                  {{ latest_record.fecha_medicion or "-" }}
+                {% else %}
+                  Sin registros previos
+                {% endif %}
+              </div>
+              <div class="small text-muted">{{ player_records|length }} mediciones disponibles</div>
+            </div>
           </div>
-          <div class="small text-muted">{{ player_records|length }} mediciones disponibles</div>
+
+          <div class="player-meta-grid">
+            <div class="player-meta-item">
+              <div class="kpi-label">Posicion</div>
+              <div class="fw-semibold">{{ selected_player.posicion or "No disponible" }}</div>
+            </div>
+            <div class="player-meta-item">
+              <div class="kpi-label">Pais / nacionalidad</div>
+              <div class="fw-semibold">{{ selected_player.nacionalidad or "No disponible" }}</div>
+            </div>
+            <div class="player-meta-item">
+              <div class="kpi-label">Edad</div>
+              <div class="fw-semibold">{% if selected_player.edad %}{{ selected_player.edad }} anos{% else %}No disponible{% endif %}</div>
+            </div>
+            <div class="player-meta-item">
+              <div class="kpi-label">Modo</div>
+              <div class="fw-semibold">{% if modo_registro == "SEGUIMIENTO" %}Seguimiento{% else %}Completo{% endif %}</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -225,28 +309,63 @@
     <div class="tab-content pt-4">
       <div class="tab-pane fade show active" id="registro-formulario-pane" role="tabpanel" aria-labelledby="registro-formulario-tab" tabindex="0">
         {% if tipo_registro == "archivo" %}
-          <div class="upload-zone p-4 mb-4">
-            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
-              <div>
-                <h4 class="form-section-title mb-1">Carga desde archivo ISAK</h4>
-                <p class="text-muted mb-0">Selecciona visualmente un Excel o CSV. El archivo todavia no se procesa ni se guarda.</p>
+          <form
+            id="registroArchivoForm"
+            method="post"
+            enctype="multipart/form-data"
+            action="{{ url_for('dashboard_physical.registro', plantel=plantel, posicion=posicion, jugadora=selected_player_id, tipo_registro=tipo_registro) }}"
+          >
+            <input type="hidden" name="id_jugadora" value="{{ selected_player_id or '' }}">
+            <input type="hidden" name="_modo" value="{{ modo_registro }}">
+            <input type="hidden" name="tipo_isak" value="COMPLETO">
+            <input type="hidden" name="metodo" value="ISAK">
+            <div class="upload-zone p-4 mb-4">
+              <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                <div>
+                  <h4 class="form-section-title mb-1">Carga desde archivo ISAK</h4>
+                  <p class="text-muted mb-1">Excel vertical con nombre del campo en columna A y valor en columna B, desde fila 5.</p>
+                  <div class="upload-help">200MB per file · XLS, XLSX</div>
+                </div>
+                <span class="badge bg-primary">Excel</span>
               </div>
-              <span class="badge bg-warning text-dark">Pendiente de conexion</span>
+              <div class="row g-3 mt-2">
+                <div class="col-12 col-lg-4">
+                  <label for="registroFechaArchivo" class="form-label small text-muted mb-1">Fecha de medicion</label>
+                  <input
+                    id="registroFechaArchivo"
+                    name="fecha_medicion"
+                    type="date"
+                    class="form-control"
+                    value="{% if validation_result and validation_result.record %}{{ validation_result.record.fecha_medicion }}{% endif %}"
+                  >
+                </div>
+                <div class="col-12 col-lg-5">
+                  <label for="registroArchivo" class="form-label small text-muted mb-1">Archivo</label>
+                  <input id="registroArchivo" name="registro_archivo" type="file" class="form-control" accept=".xlsx,.xls">
+                  <div class="form-text">Formatos admitidos: .xls y .xlsx. CSV no esta disponible para ISAK.</div>
+                </div>
+                <div class="col-12 col-lg-3">
+                  <label for="registroHoja" class="form-label small text-muted mb-1">Hoja ISAK</label>
+                  <input id="registroHoja" name="registro_hoja" type="text" class="form-control" placeholder="Activa por defecto" value="{% if validation_result and validation_result.file_sheet %}{{ validation_result.file_sheet }}{% endif %}">
+                </div>
+              </div>
             </div>
-            <div class="row g-3 mt-2">
-              <div class="col-12 col-lg-8">
-                <label for="registroArchivo" class="form-label small text-muted mb-1">Archivo</label>
-                <input id="registroArchivo" name="registro_archivo" type="file" class="form-control" accept=".xls,.xlsx,.csv">
-                <div class="form-text">Formatos visualmente admitidos: .xls, .xlsx, .csv.</div>
-              </div>
-              <div class="col-12 col-lg-4">
-                <label for="registroHoja" class="form-label small text-muted mb-1">Hoja ISAK</label>
-                <input id="registroHoja" name="registro_hoja" type="text" class="form-control" placeholder="Pendiente de lectura">
-              </div>
-            </div>
-          </div>
+          </form>
+
+          {% if validation_result and validation_result.record and validation_result.is_valid %}
+            <form
+              id="registroArchivoRecordForm"
+              method="post"
+              action="{{ url_for('dashboard_physical.registro', plantel=plantel, posicion=posicion, jugadora=selected_player_id, tipo_registro=tipo_registro) }}"
+            >
+              {% for key, value in validation_result.record.items() %}
+                <input type="hidden" name="{{ key }}" value="{% if value is not none %}{{ value }}{% endif %}">
+              {% endfor %}
+            </form>
+          {% endif %}
+
           <div class="alert alert-info mb-0">
-            Carga de archivo pendiente de conexion. No se lee, valida ni persiste ningun dato.
+            El archivo se prevalida y se guarda como una unica medicion para la jugadora seleccionada.
           </div>
         {% else %}
           <form
@@ -322,12 +441,67 @@
 
       <div class="tab-pane fade" id="registro-preview-pane" role="tabpanel" aria-labelledby="registro-preview-tab" tabindex="0">
         {% if tipo_registro == "archivo" %}
-          <div class="preview-empty p-4">
-            <h4 class="form-section-title mb-2">Previsualizacion de archivo</h4>
-            <p class="text-muted mb-0">
-              Todavia no hay archivo procesado. La lectura, mapeo y validacion visual del archivo quedan pendientes de conexion.
-            </p>
-          </div>
+          {% if validation_result and validation_result.file_analysis %}
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+              <div>
+                <h4 class="form-section-title mb-1">Previsualizacion de archivo</h4>
+                <p class="text-muted mb-0">
+                  Hoja procesada: {{ validation_result.file_sheet }}.
+                </p>
+              </div>
+              <span class="badge {% if validation_result.file_analysis.is_valid %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                {{ validation_result.file_analysis.matched_count }} / {{ validation_result.file_analysis.total_fields }} campos
+              </span>
+            </div>
+            <div class="row g-3 mb-4">
+              <div class="col-12 col-md-4">
+                <div class="border rounded p-3 bg-white h-100">
+                  <div class="kpi-label">Cobertura</div>
+                  <div class="h4 mb-0">{{ validation_result.file_analysis.coverage_pct }}%</div>
+                </div>
+              </div>
+              <div class="col-12 col-md-4">
+                <div class="border rounded p-3 bg-white h-100">
+                  <div class="kpi-label">Campos reconocidos</div>
+                  <div class="h4 mb-0">{{ validation_result.file_analysis.matched_count }}</div>
+                </div>
+              </div>
+              <div class="col-12 col-md-4">
+                <div class="border rounded p-3 bg-white h-100">
+                  <div class="kpi-label">Estado</div>
+                  <div class="h5 mb-0">{% if validation_result.is_valid %}Listo para guardar{% else %}Revisar errores{% endif %}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead>
+                  <tr>
+                    <th>Campo ISAK</th>
+                    <th>Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for key, value in validation_result.record.items() %}
+                    {% if value is not none and key not in ["usuario", "estatus_id", "tipo_isak", "_modo"] %}
+                      <tr>
+                        <td>{{ key }}</td>
+                        <td class="fw-semibold">{{ value }}</td>
+                      </tr>
+                    {% endif %}
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="preview-empty p-4">
+              <h4 class="form-section-title mb-2">Previsualizacion de archivo</h4>
+              <p class="text-muted mb-0">
+                Sube un Excel en la pestana Formulario y pulsa Prevalidar archivo para ver el mapeo antes de guardar.
+              </p>
+            </div>
+          {% endif %}
         {% else %}
           <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
             <div>
@@ -374,14 +548,24 @@
   <div class="physical-card p-4 mb-4">
     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
       <div class="text-muted small">
-        Formulario guarda en tablas ISAK RAW. Archivo y calculados siguen desactivados.
+        Se guardara la medicion ISAK validada para la jugadora seleccionada.
       </div>
       <div class="d-flex flex-wrap gap-2">
         {% if tipo_registro == "formulario" %}
           <button type="submit" form="registroIsakForm" name="registration_action" value="validate" class="btn btn-outline-primary" {% if not selected_player_id %}disabled{% endif %}>Prevalidar medicion</button>
           <button type="submit" form="registroIsakForm" name="registration_action" value="save" class="btn btn-primary" {% if not selected_player_id %}disabled{% endif %}>Guardar medicion</button>
         {% else %}
-          <button type="button" class="btn btn-primary disabled" disabled>Guardar medicion</button>
+          <button type="submit" form="registroArchivoForm" name="registration_action" value="validate_file" class="btn btn-outline-primary" {% if not selected_player_id %}disabled{% endif %}>Prevalidar archivo</button>
+          <button
+            type="submit"
+            form="registroArchivoRecordForm"
+            name="registration_action"
+            value="save_file_record"
+            class="btn btn-primary"
+            {% if not (validation_result and validation_result.is_valid) %}disabled{% endif %}
+          >
+            Guardar medicion
+          </button>
         {% endif %}
         <a href="{{ url_for('dashboard_physical.index', plantel=plantel) }}" class="btn btn-outline-primary">Volver a Inicio</a>
         <a href="{{ url_for('dashboard_physical.individual', plantel=plantel, jugadora=selected_player_id) }}" class="btn btn-outline-primary">Ir a Individual</a>
