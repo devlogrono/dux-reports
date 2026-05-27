@@ -9,3 +9,4 @@ PyMySQL
 python-dotenv
 bcrypt
 email_validator
+openpyxl==3.1.5
