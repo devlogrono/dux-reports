@@ -3,9 +3,16 @@ from __future__ import annotations
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from flask import Blueprint, Response, abort, render_template, request
-from flask_login import login_required
+from flask import Blueprint, Response, abort, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
 
+from dux.common.physical.registration import (
+    build_registration_record_from_form,
+    normalize_registration_record,
+    save_registration_record,
+    split_registration_payload,
+    validate_registration_record,
+)
 from dux.common.physical.services import (
     build_physical_grupal_context,
     build_physical_index_context,
@@ -59,13 +66,62 @@ def individual():
     )
 
 
-@bp.get("/registro")
+@bp.route("/registro", methods=["GET", "POST"])
 @login_required
 def registro():
     plantel = request.args.get("plantel") or None
     jugadora = request.args.get("jugadora") or None
     posicion = request.args.get("posicion") or None
     tipo_registro = request.args.get("tipo_registro") or "formulario"
+    validation_result = None
+
+    if request.method == "POST" and tipo_registro == "formulario":
+        action = request.form.get("registration_action") or "validate"
+        record = build_registration_record_from_form(request.form, current_user)
+        normalized_record = normalize_registration_record(record)
+        is_valid, errors = validate_registration_record(normalized_record)
+        payload = split_registration_payload(normalized_record) if is_valid else None
+
+        if is_valid and action == "save":
+            try:
+                save_registration_record(normalized_record)
+            except Exception as exc:
+                validation_result = {
+                    "submitted": True,
+                    "action": "save",
+                    "is_valid": False,
+                    "errors": [f"Error guardando ISAK: {exc}"],
+                    "record": normalized_record,
+                    "payload": payload,
+                }
+            else:
+                flash("Registro ISAK guardado correctamente.", "success")
+                return redirect(
+                    url_for(
+                        "dashboard_physical.individual",
+                        plantel=plantel,
+                        jugadora=normalized_record.get("id_jugadora"),
+                    )
+                )
+        else:
+            validation_result = {
+                "submitted": True,
+                "action": action,
+                "is_valid": is_valid,
+                "errors": errors,
+                "record": normalized_record,
+                "payload": payload,
+            }
+
+    elif request.method == "POST":
+        validation_result = {
+            "submitted": True,
+            "action": "save",
+            "is_valid": False,
+            "errors": ["El guardado de archivo todavia no esta implementado."],
+            "record": {},
+            "payload": None,
+        }
 
     context = build_physical_registro_context(
         plantel=plantel,
@@ -73,6 +129,15 @@ def registro():
         posicion=posicion,
         tipo_registro=tipo_registro,
     )
+
+    if validation_result:
+        normalized_record = validation_result.get("record") or {}
+        for section in context["form_sections"]:
+            for field in section["fields"]:
+                if field["name"] in normalized_record:
+                    field["value"] = normalized_record.get(field["name"])
+
+        context["validation_result"] = validation_result
 
     return render_template(
         "dashboard/physical/registro.html",

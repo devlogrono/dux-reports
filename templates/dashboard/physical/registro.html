@@ -62,6 +62,10 @@
     background-color: #f8fafc;
     color: #64748b;
   }
+
+  .validation-list {
+    margin-bottom: 0;
+  }
 </style>
 {% endblock %}
 
@@ -134,8 +138,8 @@
   </div>
 
   <div class="alert alert-warning border-0 shadow-sm mb-4">
-    <strong>Modo formulario pendiente de conexion:</strong>
-    esta vista todavia no guarda datos.
+    <strong>Guardado activo solo para Formulario:</strong>
+    el modo Archivo sigue pendiente de conexion y no se procesa.
   </div>
 
   <div class="alert {% if modo_registro == 'SEGUIMIENTO' %}alert-info{% else %}alert-success{% endif %} border-0 shadow-sm mb-4">
@@ -146,6 +150,24 @@
       No hay mediciones previas para esta jugadora; los campos estructurales quedan editables.
     {% endif %}
   </div>
+
+  {% if validation_result and validation_result.submitted %}
+    {% if validation_result.is_valid %}
+      <div class="alert alert-success border-0 shadow-sm mb-4">
+        <strong>Formulario listo para guardar.</strong>
+        Validacion completada. Pulsa Guardar medicion para insertar el registro ISAK.
+      </div>
+    {% else %}
+      <div class="alert alert-danger border-0 shadow-sm mb-4">
+        <strong>Errores de validacion.</strong>
+        <ul class="validation-list mt-2">
+          {% for error in validation_result.errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  {% endif %}
 
   {% if selected_player %}
     <div class="physical-card p-4 mb-4">
@@ -227,7 +249,14 @@
             Carga de archivo pendiente de conexion. No se lee, valida ni persiste ningun dato.
           </div>
         {% else %}
-          <form id="registroIsakForm">
+          <form
+            id="registroIsakForm"
+            method="post"
+            action="{{ url_for('dashboard_physical.registro', plantel=plantel, posicion=posicion, jugadora=selected_player_id, tipo_registro=tipo_registro) }}"
+          >
+            <input type="hidden" name="id_jugadora" value="{{ selected_player_id or '' }}">
+            <input type="hidden" name="_modo" value="{{ modo_registro }}">
+            <input type="hidden" name="tipo_isak" value="COMPLETO">
             {% for section in form_sections %}
               <div class="physical-card form-section p-4 mb-4">
                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
@@ -275,6 +304,9 @@
                             <span class="input-group-text">{{ field.unit }}</span>
                           {% endif %}
                         </div>
+                      {% endif %}
+                      {% if field.disabled %}
+                        <input type="hidden" name="{{ field.name }}" value="{% if field.value is not none %}{{ field.value }}{% endif %}">
                       {% endif %}
                       {% if field.disabled and field.lock_reason %}
                         <div class="form-text">{{ field.lock_reason }}</div>
@@ -342,10 +374,15 @@
   <div class="physical-card p-4 mb-4">
     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
       <div class="text-muted small">
-        No se ejecuta ningun INSERT, UPDATE ni DELETE desde esta pantalla.
+        Formulario guarda en tablas ISAK RAW. Archivo y calculados siguen desactivados.
       </div>
       <div class="d-flex flex-wrap gap-2">
-        <button type="button" class="btn btn-primary disabled" disabled>Guardar medicion</button>
+        {% if tipo_registro == "formulario" %}
+          <button type="submit" form="registroIsakForm" name="registration_action" value="validate" class="btn btn-outline-primary" {% if not selected_player_id %}disabled{% endif %}>Prevalidar medicion</button>
+          <button type="submit" form="registroIsakForm" name="registration_action" value="save" class="btn btn-primary" {% if not selected_player_id %}disabled{% endif %}>Guardar medicion</button>
+        {% else %}
+          <button type="button" class="btn btn-primary disabled" disabled>Guardar medicion</button>
+        {% endif %}
         <a href="{{ url_for('dashboard_physical.index', plantel=plantel) }}" class="btn btn-outline-primary">Volver a Inicio</a>
         <a href="{{ url_for('dashboard_physical.individual', plantel=plantel, jugadora=selected_player_id) }}" class="btn btn-outline-primary">Ir a Individual</a>
       </div>
