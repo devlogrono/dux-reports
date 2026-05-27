@@ -1280,6 +1280,260 @@ def build_physical_individual_context(
     }
 
 
+def _registro_field_value(record: dict[str, Any] | None, field: dict[str, Any]):
+    if field["name"] == "metodo":
+        return "ISAK"
+    if field["name"] == "fecha_medicion":
+        return datetime.today().date().isoformat()
+    if not record:
+        return None
+    value = record.get(field["name"])
+    if value is None:
+        return None
+    if field.get("type") == "date":
+        date_value = _coerce_date_value(value)
+        return date_value.isoformat() if date_value else None
+    return value
+
+
+def _physical_registro_form_sections(
+    baseline_record: dict[str, Any] | None = None,
+    modo_registro: str = "COMPLETO",
+) -> list[dict[str, Any]]:
+    seguimiento_locked_fields = {
+        "talla_corporal_cm",
+        "talla_sentado_cm",
+        "envergadura_cm",
+        "acromial_radial",
+        "radial_estiloidea",
+        "medial_estiloidea_dactilar",
+        "ilioespinal",
+        "trocanterea",
+        "troc_tibial_lateral",
+        "tibial_lateral",
+        "tibial_medial_maleolar_medial",
+        "pie",
+        "biacromial",
+        "torax_transverso",
+        "torax_antero_posterior",
+        "bi_iliocrestideo",
+        "humeral_biepicondilar",
+        "femoral_biepicondilar",
+        "muneca_biestiloideo",
+        "tobillo_bimaleolar",
+        "mano",
+        "perimetro_cabeza",
+    }
+
+    sections = [
+        {
+            "title": "Datos basicos",
+            "help": "Informacion general de la medicion ISAK.",
+            "fields": [
+                {"name": "fecha_medicion", "label": "Fecha de medicion", "type": "date", "unit": ""},
+                {"name": "metodo", "label": "Metodo de evaluacion", "type": "text", "unit": "", "disabled_always": True},
+                {"name": "peso_bruto_kg", "label": "Peso bruto", "type": "number", "unit": "kg"},
+                {"name": "talla_corporal_cm", "label": "Talla corporal", "type": "number", "unit": "cm"},
+                {"name": "talla_sentado_cm", "label": "Talla sentado", "type": "number", "unit": "cm"},
+                {"name": "envergadura_cm", "label": "Envergadura", "type": "number", "unit": "cm"},
+            ],
+        },
+        {
+            "title": "Pliegues",
+            "help": "Mediciones de pliegues cutaneos en milimetros.",
+            "fields": [
+                {"name": "pliegue_triceps", "label": "Triceps", "type": "number", "unit": "mm"},
+                {"name": "pliegue_subescapular", "label": "Subescapular", "type": "number", "unit": "mm"},
+                {"name": "pliegue_biceps", "label": "Biceps", "type": "number", "unit": "mm"},
+                {"name": "pliegue_cresta_iliaca", "label": "Cresta iliaca", "type": "number", "unit": "mm"},
+                {"name": "pliegue_supraespinal", "label": "Supraespinal", "type": "number", "unit": "mm"},
+                {"name": "pliegue_abdominal", "label": "Abdominal", "type": "number", "unit": "mm"},
+                {"name": "pliegue_muslo_frontal", "label": "Muslo frontal", "type": "number", "unit": "mm"},
+                {"name": "pliegue_pantorrilla_maxima", "label": "Pantorrilla maxima", "type": "number", "unit": "mm"},
+                {"name": "pliegue_antebrazo", "label": "Antebrazo", "type": "number", "unit": "mm"},
+            ],
+        },
+        {
+            "title": "Perimetros",
+            "help": "Perimetros corporales registrados en centimetros.",
+            "fields": [
+                {"name": "perimetro_cabeza", "label": "Cabeza", "type": "number", "unit": "cm"},
+                {"name": "perimetro_cuello", "label": "Cuello", "type": "number", "unit": "cm"},
+                {"name": "perimetro_brazo_relajado", "label": "Brazo relajado", "type": "number", "unit": "cm"},
+                {"name": "perimetro_brazo_flexionado_en_tension", "label": "Brazo flexionado en tension", "type": "number", "unit": "cm"},
+                {"name": "perimetro_antebrazo_maximo", "label": "Antebrazo maximo", "type": "number", "unit": "cm"},
+                {"name": "perimetro_muneca", "label": "Muneca", "type": "number", "unit": "cm"},
+                {"name": "perimetro_torax_mesoesternal", "label": "Torax mesoesternal", "type": "number", "unit": "cm"},
+                {"name": "perimetro_cintura_minima", "label": "Cintura minima", "type": "number", "unit": "cm"},
+                {"name": "perimetro_abdominal_maxima", "label": "Abdominal maxima", "type": "number", "unit": "cm"},
+                {"name": "perimetro_cadera_maximo", "label": "Cadera maxima", "type": "number", "unit": "cm"},
+                {"name": "perimetro_muslo_maximo", "label": "Muslo maximo", "type": "number", "unit": "cm"},
+                {"name": "perimetro_muslo_medial", "label": "Muslo medial", "type": "number", "unit": "cm"},
+                {"name": "perimetro_pantorrilla_maxima", "label": "Pantorrilla maxima", "type": "number", "unit": "cm"},
+                {"name": "perimetro_tobillo_minima", "label": "Tobillo minima", "type": "number", "unit": "cm"},
+            ],
+        },
+        {
+            "title": "Diametros",
+            "help": "Diametros oseos y anchos corporales.",
+            "fields": [
+                {"name": "biacromial", "label": "Biacromial", "type": "number", "unit": "cm"},
+                {"name": "torax_transverso", "label": "Torax transverso", "type": "number", "unit": "cm"},
+                {"name": "torax_antero_posterior", "label": "Torax antero-posterior", "type": "number", "unit": "cm"},
+                {"name": "bi_iliocrestideo", "label": "Bi-iliocrestideo", "type": "number", "unit": "cm"},
+                {"name": "humeral_biepicondilar", "label": "Humeral biepicondilar", "type": "number", "unit": "cm"},
+                {"name": "femoral_biepicondilar", "label": "Femoral biepicondilar", "type": "number", "unit": "cm"},
+                {"name": "muneca_biestiloideo", "label": "Muneca biestiloideo", "type": "number", "unit": "cm"},
+                {"name": "tobillo_bimaleolar", "label": "Tobillo bimaleolar", "type": "number", "unit": "cm"},
+                {"name": "mano", "label": "Mano", "type": "number", "unit": "cm"},
+            ],
+        },
+        {
+            "title": "Longitudes",
+            "help": "Longitudes segmentarias disponibles en el registro original.",
+            "fields": [
+                {"name": "acromial_radial", "label": "Acromial-radial", "type": "number", "unit": "cm"},
+                {"name": "radial_estiloidea", "label": "Radial-estiloidea", "type": "number", "unit": "cm"},
+                {"name": "medial_estiloidea_dactilar", "label": "Medial-estiloidea-dactilar", "type": "number", "unit": "cm"},
+                {"name": "ilioespinal", "label": "Ilioespinal", "type": "number", "unit": "cm"},
+                {"name": "trocanterea", "label": "Trocanterea", "type": "number", "unit": "cm"},
+                {"name": "troc_tibial_lateral", "label": "Troc-tibial lateral", "type": "number", "unit": "cm"},
+                {"name": "tibial_lateral", "label": "Tibial lateral", "type": "number", "unit": "cm"},
+                {"name": "tibial_medial_maleolar_medial", "label": "Tibial medial-maleolar medial", "type": "number", "unit": "cm"},
+                {"name": "pie", "label": "Pie", "type": "number", "unit": "cm"},
+            ],
+        },
+        {
+            "title": "Observaciones",
+            "help": "Notas cualitativas de la sesion. Pendiente de conexion a guardado.",
+            "fields": [
+                {"name": "observaciones", "label": "Observaciones", "type": "textarea", "unit": ""},
+            ],
+        },
+    ]
+
+    is_seguimiento = modo_registro == "SEGUIMIENTO"
+    for section in sections:
+        for field in section["fields"]:
+            field["value"] = _registro_field_value(baseline_record, field)
+            field["disabled"] = bool(field.get("disabled_always")) or (
+                is_seguimiento and field["name"] in seguimiento_locked_fields
+            )
+            field["lock_reason"] = "Precargado desde el ultimo ISAK" if field["disabled"] and is_seguimiento else ""
+
+    return sections
+
+
+def build_physical_registro_context(
+    plantel: str | None = None,
+    jugadora: str | None = None,
+    posicion: str | None = None,
+    tipo_registro: str = "formulario",
+) -> dict[str, Any]:
+    """
+    Contexto GET read-only para la primera pantalla de registro Physical.
+    """
+    tipo_registro = str(tipo_registro or "formulario").lower()
+    if tipo_registro not in {"formulario", "archivo"}:
+        tipo_registro = "formulario"
+
+    competitions = get_physical_competitions()
+    player_info = get_physical_players(plantel=plantel)
+    position_options = sorted(
+        {
+            str(player.get("posicion")).strip()
+            for player in player_info
+            if player.get("posicion") and str(player.get("posicion")).strip()
+        }
+    )
+    if posicion and posicion not in position_options:
+        posicion = None
+
+    if posicion:
+        player_info = [
+            player
+            for player in player_info
+            if str(player.get("posicion") or "").strip() == posicion
+        ]
+
+    player_info_by_id = {
+        str(player.get("identificacion")): player
+        for player in player_info
+        if player.get("identificacion")
+    }
+    filtered_player_ids = set(player_info_by_id)
+
+    raw_records = get_physical_full_records(plantel=plantel)
+    if posicion:
+        raw_records = [
+            record
+            for record in raw_records
+            if str(record.get("identificacion")) in filtered_player_ids
+        ]
+    records = [build_record_antropometrico(record) for record in raw_records]
+    players = _player_options_from_records(records, player_info_by_id)
+
+    if not players:
+        players = [
+            {
+                "id": str(player.get("identificacion")),
+                "nombre": str(player.get("nombre_jugadora") or "").strip(),
+                "plantel": player.get("plantel"),
+                "fecha_ultima": None,
+            }
+            for player in player_info
+            if player.get("identificacion")
+        ]
+
+    selected_player_id = str(jugadora) if jugadora else (players[0]["id"] if players else None)
+    if selected_player_id and players and selected_player_id not in {player["id"] for player in players}:
+        selected_player_id = players[0]["id"]
+
+    records_by_player = _records_by_player(records)
+    player_records = _sort_records(records_by_player.get(selected_player_id, []), reverse=True) if selected_player_id else []
+    latest_record = player_records[0] if player_records else None
+    modo_registro = "SEGUIMIENTO" if latest_record else "COMPLETO"
+
+    selected_player = next(
+        (player for player in players if player["id"] == str(selected_player_id)),
+        None,
+    ) if selected_player_id else None
+
+    selected_player_info = player_info_by_id.get(str(selected_player_id), {}) if selected_player_id else {}
+    if selected_player:
+        selected_player = {
+            **selected_player,
+            "dorsal": selected_player_info.get("dorsal"),
+            "nacionalidad": selected_player_info.get("nacionalidad"),
+            "posicion": selected_player_info.get("posicion"),
+            "fecha_nacimiento": selected_player_info.get("fecha_nacimiento"),
+            "edad": _calculate_age(selected_player_info.get("fecha_nacimiento")),
+        }
+
+    form_sections = _physical_registro_form_sections(
+        baseline_record=latest_record,
+        modo_registro=modo_registro,
+    )
+
+    return {
+        "competitions": competitions,
+        "plantel": plantel,
+        "posicion": posicion,
+        "position_options": position_options,
+        "tipo_registro": tipo_registro,
+        "players": players,
+        "selected_player_id": selected_player_id,
+        "selected_player": selected_player,
+        "latest_record": latest_record,
+        "modo_registro": modo_registro,
+        "modo_registro_label": "Registro ISAK de seguimiento" if modo_registro == "SEGUIMIENTO" else "Nuevo registro ISAK completo",
+        "player_records": player_records,
+        "form_sections": form_sections,
+        "form_field_count": sum(len(section["fields"]) for section in form_sections),
+        "is_read_only": True,
+    }
+
+
 def _build_group_metrics(
     records: list[dict[str, Any]],
     all_records: list[dict[str, Any]],

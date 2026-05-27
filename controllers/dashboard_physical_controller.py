@@ -10,6 +10,7 @@ from dux.common.physical.services import (
     build_physical_grupal_context,
     build_physical_index_context,
     build_physical_individual_context,
+    build_physical_registro_context,
     get_physical_player_photo_sources,
     normalize_player_photo_url,
 )
@@ -54,6 +55,27 @@ def individual():
 
     return render_template(
         "dashboard/physical/individual.html",
+        **context,
+    )
+
+
+@bp.get("/registro")
+@login_required
+def registro():
+    plantel = request.args.get("plantel") or None
+    jugadora = request.args.get("jugadora") or None
+    posicion = request.args.get("posicion") or None
+    tipo_registro = request.args.get("tipo_registro") or "formulario"
+
+    context = build_physical_registro_context(
+        plantel=plantel,
+        jugadora=jugadora,
+        posicion=posicion,
+        tipo_registro=tipo_registro,
+    )
+
+    return render_template(
+        "dashboard/physical/registro.html",
         **context,
     )
 
