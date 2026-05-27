@@ -101,13 +101,14 @@ def create_app(config_object: type[Config] | None = None) -> Flask:
     from .controllers.admin_controller import admin_bp
     from .controllers.dashboard_actas_controller import bp as dashboard_actas_bp
     from .controllers.dashboard_futbolistas_controller import bp as dashboard_futbolistas_bp
+    from .controllers.dashboard_physical_controller import bp as dashboard_physical_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(landing_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(dashboard_actas_bp)
     app.register_blueprint(dashboard_futbolistas_bp)
-
+    app.register_blueprint(dashboard_physical_bp)
     # Root route -> redirect to dashboard or login
     @app.get("/")
     def index():
