@@ -62,11 +62,13 @@ class DashboardWellnessRouteTest(unittest.TestCase):
                 fecha_sesion DATE,
                 tipo TEXT,
                 turno TEXT,
+                periodizacion_tactica TEXT,
                 recuperacion INTEGER,
                 fatiga INTEGER,
                 sueno INTEGER,
                 stress INTEGER,
                 dolor INTEGER,
+                id_zona_segmento_dolor INTEGER,
                 minutos_sesion INTEGER,
                 rpe REAL,
                 ua REAL,
@@ -98,13 +100,14 @@ class DashboardWellnessRouteTest(unittest.TestCase):
         conn.execute(
             """
             INSERT INTO wellness (
-                id, id_jugadora, fecha_sesion, tipo, turno, recuperacion, fatiga,
-                sueno, stress, dolor, minutos_sesion, rpe, ua, observacion,
+                id, id_jugadora, fecha_sesion, tipo, turno, periodizacion_tactica,
+                recuperacion, fatiga, sueno, stress, dolor, id_zona_segmento_dolor,
+                minutos_sesion, rpe, ua, observacion,
                 fecha_hora_registro, usuario, estatus_id
             )
             VALUES (
-                1, 'player-1', ?, 'checkOut', 'mañana', 4, 3,
-                5, 2, 1, 60, 5, 300, '', ?, 'test', 2
+                1, 'player-1', ?, 'checkOut', 'Turno 1', 'MD+1 / MD-6',
+                4, 3, 5, 2, 1, NULL, 60, 5, 300, '', ?, 'test', 2
             )
             """,
             (today, f"{today} 09:00:00"),
@@ -112,13 +115,14 @@ class DashboardWellnessRouteTest(unittest.TestCase):
         conn.execute(
             """
             INSERT INTO wellness (
-                id, id_jugadora, fecha_sesion, tipo, turno, recuperacion, fatiga,
-                sueno, stress, dolor, minutos_sesion, rpe, ua, observacion,
+                id, id_jugadora, fecha_sesion, tipo, turno, periodizacion_tactica,
+                recuperacion, fatiga, sueno, stress, dolor, id_zona_segmento_dolor,
+                minutos_sesion, rpe, ua, observacion,
                 fecha_hora_registro, usuario, estatus_id
             )
             VALUES (
-                2, 'player-2', ?, 'checkOut', 'mañana', 1, 1,
-                1, 1, 1, 60, 4, 240, '', ?, 'test', 2
+                2, 'player-2', ?, 'checkOut', 'Turno 1', 'MD+1 / MD-6',
+                1, 1, 1, 1, 1, NULL, 60, 4, 240, '', ?, 'test', 2
             )
             """,
             (today, f"{today} 10:00:00"),
@@ -150,7 +154,9 @@ class DashboardWellnessRouteTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Wellness", response.data)
-        self.assertIn(b"Registros de Wellness y RPE", response.data)
+        self.assertIn(b"Indicadores de bienestar", response.data)
+        self.assertIn(b"Solo lectura", response.data)
+        self.assertIn(b"Registro Wellness", response.data)
         self.assertIn(b"Test, Alexia", response.data)
         self.assertIn(b"1FF", response.data)
         self.assertIn(b"checkOut", response.data)
@@ -163,6 +169,124 @@ class DashboardWellnessRouteTest(unittest.TestCase):
         self.assertIn(b'id="chart-wellness"', response.data)
         self.assertIn(b'id="chart-rpe"', response.data)
         self.assertIn(b'id="chart-ua"', response.data)
+
+    def test_dashboard_wellness_registro_shell_renders_for_logged_user(self):
+        with self.client.session_transaction() as session:
+            session["_user_id"] = "test-user"
+            session["_fresh"] = True
+
+        response = self.client.get("/dashboard/wellness/registro/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Registro Wellness", response.data)
+        self.assertIn(b"Guardar Check-in", response.data)
+        self.assertIn(b"Check-in", response.data)
+        self.assertIn(b"Check-out / RPE / UA", response.data)
+        self.assertIn(b"Ausencias", response.data)
+        self.assertIn(b"Pendiente PR 11", response.data)
+        self.assertIn(b"Pendiente PR 12", response.data)
+        self.assertIn(b"Test, Alexia", response.data)
+
+    def test_dashboard_wellness_registro_creates_checkin(self):
+        with self.client.session_transaction() as session:
+            session["_user_id"] = "test-user"
+            session["_fresh"] = True
+
+        response = self.client.post(
+            "/dashboard/wellness/registro/",
+            data={
+                "plantel": "1FF",
+                "id_jugadora": "player-1",
+                "fecha_sesion": "2026-05-28",
+                "turno": "Turno 2",
+                "periodizacion_tactica": "MD+1 / MD-6",
+                "recuperacion": "1",
+                "fatiga": "2",
+                "sueno": "3",
+                "stress": "2",
+                "dolor": "1",
+                "observacion": "Test checkin",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        conn = sqlite3.connect(self.tmp.name)
+        row = conn.execute(
+            """
+            SELECT id_jugadora, fecha_sesion, tipo, turno, recuperacion, fatiga,
+                   sueno, stress, dolor, observacion, usuario, estatus_id
+            FROM wellness
+            WHERE id_jugadora = 'player-1' AND fecha_sesion = '2026-05-28'
+            """
+        ).fetchone()
+        conn.close()
+
+        self.assertEqual(
+            row,
+            (
+                "player-1",
+                "2026-05-28",
+                "checkin",
+                "Turno 2",
+                1,
+                2,
+                3,
+                2,
+                1,
+                "Test checkin",
+                "Test",
+                1,
+            ),
+        )
+
+    def test_dashboard_wellness_registro_rejects_duplicate_checkin(self):
+        with self.client.session_transaction() as session:
+            session["_user_id"] = "test-user"
+            session["_fresh"] = True
+
+        response = self.client.post(
+            "/dashboard/wellness/registro/",
+            data={
+                "plantel": "1FF",
+                "id_jugadora": "player-1",
+                "fecha_sesion": date.today().isoformat(),
+                "turno": "Turno 1",
+                "periodizacion_tactica": "MD+1 / MD-6",
+                "recuperacion": "1",
+                "fatiga": "2",
+                "sueno": "3",
+                "stress": "2",
+                "dolor": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Ya existe un Check-in", response.data)
+
+    def test_dashboard_wellness_registro_validates_checkin_fields(self):
+        with self.client.session_transaction() as session:
+            session["_user_id"] = "test-user"
+            session["_fresh"] = True
+
+        response = self.client.post(
+            "/dashboard/wellness/registro/",
+            data={
+                "plantel": "1FF",
+                "id_jugadora": "player-1",
+                "fecha_sesion": "2026-05-29",
+                "turno": "Turno 1",
+                "recuperacion": "0",
+                "fatiga": "2",
+                "sueno": "3",
+                "stress": "2",
+                "dolor": "4",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"recuperacion debe estar entre 1 y 5", response.data)
+        self.assertIn(b"Selecciona una zona de dolor", response.data)
 
     def test_dashboard_wellness_route_applies_selected_plantel(self):
         with self.client.session_transaction() as session:
