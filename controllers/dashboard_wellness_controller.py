@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from flask import Blueprint, render_template, request
+from flask import Blueprint, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import bindparam, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -144,6 +144,332 @@ def _fetch_filter_options():
         seen_jugadoras.add(jugadora_id)
 
     return planteles, jugadoras, tipos
+
+
+def _fetch_player_options():
+    sql = """
+        SELECT DISTINCT
+            identificacion AS id_jugadora,
+            nombre,
+            apellido,
+            competicion AS plantel
+        FROM futbolistas
+        WHERE identificacion IS NOT NULL
+          AND (genero = 'F' OR genero IS NULL)
+          AND (id_estado = 1 OR id_estado IS NULL)
+        ORDER BY competicion ASC, apellido ASC, nombre ASC
+    """
+    rows = db.session.execute(text(sql)).mappings().all()
+
+    planteles = []
+    seen_planteles = set()
+    jugadoras = []
+    for row in rows:
+        plantel = row["plantel"]
+        if plantel and plantel not in seen_planteles:
+            planteles.append(plantel)
+            seen_planteles.add(plantel)
+
+        nombre_completo = f"{row['apellido'] or ''}, {row['nombre'] or ''}".strip(", ")
+        jugadoras.append(
+            {
+                "id": row["id_jugadora"],
+                "nombre": nombre_completo or row["id_jugadora"],
+                "plantel": plantel,
+            }
+        )
+
+    return planteles, jugadoras
+
+
+def _fetch_pain_zone_options():
+    try:
+        rows = db.session.execute(text(
+            "SELECT id, nombre FROM zonas_segmento ORDER BY nombre ASC"
+        )).mappings().all()
+    except SQLAlchemyError:
+        return []
+
+    return [{"id": row["id"], "nombre": row["nombre"]} for row in rows]
+
+
+def _fetch_absence_reason_options():
+    try:
+        rows = db.session.execute(text(
+            "SELECT id, nombre FROM tipo_ausencia ORDER BY nombre ASC"
+        )).mappings().all()
+    except SQLAlchemyError:
+        return []
+
+    return [{"id": row["id"], "nombre": row["nombre"]} for row in rows]
+
+
+def _fetch_data_entry_options(selected_planteles=None):
+    planteles, jugadoras = _fetch_player_options()
+    selected_planteles = _selected_planteles(selected_planteles or [], planteles)
+    visible_jugadoras = _filter_jugadoras_by_plantel(jugadoras, selected_planteles)
+    return {
+        "planteles": planteles,
+        "jugadoras": visible_jugadoras,
+        "pain_zones": _fetch_pain_zone_options(),
+        "absence_reasons": _fetch_absence_reason_options(),
+        "selected_planteles": selected_planteles,
+        "turnos": ["Turno 1", "Turno 2", "Turno 3"],
+        "absence_turnos": ["Todos", "Turno 1", "Turno 2", "Turno 3"],
+        "wellness_fields": [
+            "Recuperación",
+            "Energía",
+            "Sueño",
+            "Estrés",
+            "Dolor",
+        ],
+    }
+
+
+def _parse_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _validate_checkin_form(form, available_jugadoras):
+    errors = []
+    available_ids = {jugadora["id"] for jugadora in available_jugadoras}
+
+    id_jugadora = form.get("id_jugadora")
+    if id_jugadora not in available_ids:
+        errors.append("Selecciona una jugadora válida.")
+
+    fecha_sesion = form.get("fecha_sesion") or date.today().isoformat()
+    try:
+        date.fromisoformat(fecha_sesion)
+    except ValueError:
+        errors.append("La fecha de sesión no es válida.")
+
+    turno = form.get("turno") or "Turno 1"
+    if turno not in ["Turno 1", "Turno 2", "Turno 3"]:
+        errors.append("Selecciona un turno válido.")
+
+    record = {
+        "id_jugadora": id_jugadora,
+        "fecha_sesion": fecha_sesion,
+        "tipo": "checkin",
+        "turno": turno,
+        "periodizacion_tactica": form.get("periodizacion_tactica") or "",
+        "recuperacion": _parse_int(form.get("recuperacion")),
+        "fatiga": _parse_int(form.get("fatiga")),
+        "sueno": _parse_int(form.get("sueno")),
+        "stress": _parse_int(form.get("stress")),
+        "dolor": _parse_int(form.get("dolor")),
+        "id_zona_segmento_dolor": _parse_int(form.get("id_zona_segmento_dolor")),
+        "observacion": form.get("observacion") or "",
+        "usuario": (
+            getattr(current_user, "name", None)
+            or getattr(current_user, "email", None)
+            or "unknown"
+        ),
+    }
+
+    for field in ["recuperacion", "fatiga", "sueno", "stress", "dolor"]:
+        value = record[field]
+        if value is None:
+            errors.append(f"Completa el campo {field}.")
+        elif not 1 <= value <= 5:
+            errors.append(f"El campo {field} debe estar entre 1 y 5.")
+
+    if record["dolor"] is not None and record["dolor"] > 1 and record["id_zona_segmento_dolor"] is None:
+        errors.append("Selecciona una zona de dolor.")
+
+    return record, errors
+
+
+def _checkin_exists(record):
+    sql = """
+        SELECT id
+        FROM wellness
+        WHERE id_jugadora = :id_jugadora
+          AND fecha_sesion = :fecha_sesion
+          AND turno = :turno
+          AND (estatus_id IS NULL OR estatus_id <= 2)
+        LIMIT 1
+    """
+    row = db.session.execute(
+        text(sql),
+        {
+            "id_jugadora": record["id_jugadora"],
+            "fecha_sesion": record["fecha_sesion"],
+            "turno": record["turno"],
+        },
+    ).first()
+    return row is not None
+
+
+def _find_active_wellness_record(record):
+    sql = """
+        SELECT id
+        FROM wellness
+        WHERE id_jugadora = :id_jugadora
+          AND fecha_sesion = :fecha_sesion
+          AND turno = :turno
+          AND (estatus_id IS NULL OR estatus_id <= 2)
+        LIMIT 1
+    """
+    return db.session.execute(
+        text(sql),
+        {
+            "id_jugadora": record["id_jugadora"],
+            "fecha_sesion": record["fecha_sesion"],
+            "turno": record["turno"],
+        },
+    ).mappings().first()
+
+
+def _insert_checkin(record):
+    sql = """
+        INSERT INTO wellness (
+            id_jugadora, fecha_sesion, tipo, turno, periodizacion_tactica,
+            recuperacion, fatiga, sueno, stress, dolor, id_zona_segmento_dolor,
+            observacion, usuario, estatus_id
+        ) VALUES (
+            :id_jugadora, :fecha_sesion, :tipo, :turno, :periodizacion_tactica,
+            :recuperacion, :fatiga, :sueno, :stress, :dolor, :id_zona_segmento_dolor,
+            :observacion, :usuario, 1
+        )
+    """
+    db.session.execute(text(sql), record)
+    db.session.commit()
+    cache.clear()
+
+
+def _validate_checkout_form(form, available_jugadoras):
+    errors = []
+    available_ids = {jugadora["id"] for jugadora in available_jugadoras}
+
+    id_jugadora = form.get("id_jugadora")
+    if id_jugadora not in available_ids:
+        errors.append("Selecciona una jugadora válida.")
+
+    fecha_sesion = form.get("fecha_sesion") or date.today().isoformat()
+    try:
+        date.fromisoformat(fecha_sesion)
+    except ValueError:
+        errors.append("La fecha de sesión no es válida.")
+
+    turno = form.get("turno") or "Turno 1"
+    if turno not in ["Turno 1", "Turno 2", "Turno 3"]:
+        errors.append("Selecciona un turno válido.")
+
+    minutos_sesion = _parse_int(form.get("minutos_sesion"))
+    rpe = _parse_int(form.get("rpe"))
+
+    if minutos_sesion is None:
+        errors.append("Completa los minutos de sesión.")
+    elif minutos_sesion <= 0:
+        errors.append("Los minutos de sesión deben ser mayores que 0.")
+
+    if rpe is None:
+        errors.append("Completa el RPE.")
+    elif not 1 <= rpe <= 10:
+        errors.append("El RPE debe estar entre 1 y 10.")
+
+    record = {
+        "id_jugadora": id_jugadora,
+        "fecha_sesion": fecha_sesion,
+        "tipo": "checkOut",
+        "turno": turno,
+        "minutos_sesion": minutos_sesion,
+        "rpe": rpe,
+        "ua": minutos_sesion * rpe if minutos_sesion is not None and rpe is not None else None,
+        "usuario": (
+            getattr(current_user, "name", None)
+            or getattr(current_user, "email", None)
+            or "unknown"
+        ),
+    }
+
+    return record, errors
+
+
+def _validate_absence_form(form, available_jugadoras, absence_reasons):
+    errors = []
+    available_ids = {jugadora["id"] for jugadora in available_jugadoras}
+    reason_ids = {str(reason["id"]) for reason in absence_reasons}
+
+    id_jugadora = form.get("id_jugadora")
+    if id_jugadora not in available_ids:
+        errors.append("Selecciona una jugadora válida.")
+
+    fecha_inicio = form.get("fecha_inicio") or date.today().isoformat()
+    fecha_fin = form.get("fecha_fin") or fecha_inicio
+    try:
+        inicio = date.fromisoformat(fecha_inicio)
+        fin = date.fromisoformat(fecha_fin)
+    except ValueError:
+        errors.append("Las fechas de ausencia no son válidas.")
+        inicio = None
+        fin = None
+
+    if inicio and fin and fin < inicio:
+        errors.append("La fecha final no puede ser menor que la fecha inicial.")
+
+    motivo_id = form.get("motivo_id")
+    if motivo_id not in reason_ids:
+        errors.append("Selecciona un motivo de ausencia válido.")
+
+    turno = form.get("ausencia_turno") or "Todos"
+    if turno not in ["Todos", "Turno 1", "Turno 2", "Turno 3"]:
+        errors.append("Selecciona un turno válido.")
+
+    record = {
+        "id_jugadora": id_jugadora,
+        "fecha_inicio": fecha_inicio,
+        "fecha_fin": fecha_fin,
+        "motivo_id": _parse_int(motivo_id),
+        "turno": turno,
+        "observacion": form.get("ausencia_observacion") or "",
+        "usuario": (
+            getattr(current_user, "name", None)
+            or getattr(current_user, "email", None)
+            or "unknown"
+        ),
+    }
+
+    return record, errors
+
+
+def _insert_absence(record):
+    sql = """
+        INSERT INTO ausencias (
+            id_jugadora, fecha_inicio, fecha_fin, motivo_id, turno, observacion, usuario
+        ) VALUES (
+            :id_jugadora, :fecha_inicio, :fecha_fin, :motivo_id, :turno, :observacion, :usuario
+        )
+    """
+    db.session.execute(text(sql), record)
+    db.session.commit()
+    cache.clear()
+
+
+def _update_checkout(record):
+    row = _find_active_wellness_record(record)
+    if row is None:
+        return False
+
+    sql = """
+        UPDATE wellness
+        SET tipo = :tipo,
+            minutos_sesion = :minutos_sesion,
+            rpe = :rpe,
+            ua = :ua,
+            usuario = :usuario,
+            estatus_id = 2
+        WHERE id = :id
+    """
+    db.session.execute(text(sql), {**record, "id": row["id"]})
+    db.session.commit()
+    cache.clear()
+    return True
 
 
 def _fetch_wellness_records(planteles, jugadoras, tipos, since, limit=None):
@@ -393,4 +719,85 @@ def index():
         display_records=records[:200],
         summary=summary,
         charts=charts,
+    )
+
+
+@bp.route("/registro/", methods=["GET", "POST"])
+@login_required
+def registro():
+    options = {
+        "planteles": [],
+        "jugadoras": [],
+        "pain_zones": [],
+        "absence_reasons": [],
+        "selected_planteles": [],
+        "turnos": ["Turno 1", "Turno 2", "Turno 3"],
+        "absence_turnos": ["Todos", "Turno 1", "Turno 2", "Turno 3"],
+        "wellness_fields": [
+            "Recuperación",
+            "Energía",
+            "Sueño",
+            "Estrés",
+            "Dolor",
+        ],
+    }
+    error = None
+    form_errors = []
+    form_data = {
+        "fecha_sesion": date.today().isoformat(),
+        "fecha_inicio": date.today().isoformat(),
+        "fecha_fin": date.today().isoformat(),
+        "turno": "Turno 1",
+        "ausencia_turno": "Todos",
+    }
+    saved = request.args.get("saved")
+
+    try:
+        requested_planteles = request.form.getlist("plantel") or request.args.getlist("plantel")
+        options = _fetch_data_entry_options(requested_planteles)
+        form_data.update(request.form.to_dict())
+
+        if request.method == "POST":
+            action = request.form.get("action", "checkin")
+            if action == "checkout":
+                record, form_errors = _validate_checkout_form(request.form, options["jugadoras"])
+            elif action == "ausencia":
+                record, form_errors = _validate_absence_form(
+                    request.form,
+                    options["jugadoras"],
+                    options["absence_reasons"],
+                )
+            else:
+                record, form_errors = _validate_checkin_form(request.form, options["jugadoras"])
+            form_data.update(record)
+
+            if action == "checkin" and not form_errors and _checkin_exists(record):
+                form_errors.append("Ya existe un Check-in para esta jugadora, fecha y turno.")
+
+            if not form_errors:
+                if action == "checkout":
+                    updated = _update_checkout(record)
+                    if not updated:
+                        form_errors.append(
+                            "No existe un Check-in previo para esta jugadora, fecha y turno."
+                        )
+                    else:
+                        return redirect(url_for("dashboard_wellness.registro", saved="checkout"))
+                elif action == "ausencia":
+                    _insert_absence(record)
+                    return redirect(url_for("dashboard_wellness.registro", saved="ausencia"))
+                else:
+                    _insert_checkin(record)
+                    return redirect(url_for("dashboard_wellness.registro", saved="checkin"))
+    except SQLAlchemyError:
+        db.session.rollback()
+        error = "No se pudo procesar el registro Wellness."
+
+    return render_template(
+        "dashboard/wellness_registro.html",
+        error=error,
+        form_errors=form_errors,
+        form_data=form_data,
+        saved=saved,
+        **options,
     )
